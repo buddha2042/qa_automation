@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="850" height="1100" viewBox="0 0 850 1100">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="50" y="80" font-size="36" font-weight="700">SisenseDashboard</text>
+  <text x="50" y="120" font-size="14">Company: Contoso Parts LLC</text>
+  <text x="50" y="140" font-size="14">Address: 1 Market Street, San Francisco, CA</text>
+  <text x="600" y="120" font-size="14">SisenseDashboard #: SO-10025</text>
+  <text x="600" y="140" font-size="14">Order Date: 2024-05-12</text>
+  <text x="600" y="160" font-size="14">Due Date: 2024-05-30</text>
+
+  <rect x="50" y="190" width="340" height="110" fill="#f6f6f6" stroke="#ddd"/>
+  <text x="60" y="210" font-size="14" font-weight="600">Bill To</text>
+  <text x="60" y="235" font-size="13">Adventure Works</text>
+  <text x="60" y="255" font-size="13">Customer ID: C-1001</text>
+  <text x="60" y="275" font-size="13">1 First Ave, Seattle, WA</text>
+
+  <rect x="420" y="190" width="380" height="110" fill="#f6f6f6" stroke="#ddd"/>
+  <text x="430" y="210" font-size="14" font-weight="600">Ship To</text>
+  <text x="430" y="235" font-size="13">Adventure Works Warehouse</text>
+  <text x="430" y="255" font-size="13">12 Dock Rd, Tacoma, WA</text>
+
+  <text x="50" y="340" font-size="14" font-weight="600">Items</text>
+  <rect x="50" y="350" width="750" height="32" fill="#eaeaea"/>
+  <text x="60" y="370" font-size="12" font-weight="600">ITEM #</text>
+  <text x="170" y="370" font-size="12" font-weight="600">DESCRIPTION</text>
+  <text x="520" y="370" font-size="12" font-weight="600">QTY</text>
+  <text x="580" y="370" font-size="12" font-weight="600">UNIT</text>
+  <text x="660" y="370" font-size="12" font-weight="600">TOTAL</text>
+
+  <text x="60" y="400" font-size="12">AR-5381</text>
+  <text x="170" y="400" font-size="12">Adjustable Race</text>
+  <text x="520" y="400" font-size="12">5</text>
+  <text x="580" y="400" font-size="12">75.00</text>
+  <text x="660" y="400" font-size="12">375.00</text>
+
+  <text x="60" y="430" font-size="12">BA-8327</text>
+  <text x="170" y="430" font-size="12">Bearing Ball</text>
+  <text x="520" y="430" font-size="12">10</text>
+  <text x="580" y="430" font-size="12">5.50</text>
+  <text x="660" y="430" font-size="12">55.00</text>
+
+  <line x1="50" y1="460" x2="800" y2="460" stroke="#ddd"/>
+  <text x="560" y="500" font-size="12">Subtotal:</text>
+  <text x="720" y="500" font-size="12">430.00</text>
+  <text x="560" y="520" font-size="12">Tax (8%):</text>
+  <text x="720" y="520" font-size="12">34.40</text>
+  <text x="560" y="540" font-size="12">Freight:</text>
+  <text x="720" y="540" font-size="12">12.00</text>
+  <text x="560" y="560" font-size="14" font-weight="600">Total:</text>
+  <text x="720" y="560" font-size="14" font-weight="600">476.40</text>
+</svg>

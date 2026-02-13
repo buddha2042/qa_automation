@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0b1020;
+  --bg-soft: #121a2e;
+  --panel: #0f172a;
+  --card: #111827;
+  --muted: #94a3b8;
+  --text: #e5e7eb;
+  --primary: #4f46e5; /* indigo-600 */
+  --primary-700: #4338ca;
+  --border: #1f2937;
+  --success: #16a34a;
+  --danger: #dc2626;
+}
+
+/* theme vars consumed directly via CSS variables */
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* App shell */
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: 64px 1fr;
+  grid-template-areas:
+    "sidebar topbar"
+    "sidebar main";
+  min-height: 100vh;
+}
+.app-sidebar { grid-area: sidebar; background: var(--panel); border-right: 1px solid var(--border); }
+.app-topbar { grid-area: topbar; background: var(--bg-soft); border-bottom: 1px solid var(--border); }
+.app-main { grid-area: main; background: var(--bg); }
+
+/* UI elements */
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.btn { background: var(--primary); color: white; border-radius: 8px; padding: 0.5rem 0.9rem; }
+.btn:hover { background: var(--primary-700); }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.9rem; }
+.input { background: #0b1222; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 0.45rem 0.6rem; }
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; padding: 0.5rem; background: #0e1629; border-bottom: 1px solid var(--border); color: var(--muted); }
+.table td { padding: 0.8rem; border-bottom: 1px solid var(--border); }
