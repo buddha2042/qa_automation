@@ -1,25 +1,10 @@
-## Stryker SisenseDashboard testion App
+## SisenseDashboard testion App
 
 React/Next.js front end with a Flask + Gemini backend to test structured fields from SisenseDashboards (PNG/JPG/PDF), allow editing, and save to SQLite.
 
 ### Prerequisites
 - Node 18+
 - Python 3.10+
-- A Google Gemini API key
-
-### Environment Variables
-Create `stryker-ai/.env.local` with:
-
-```
-NEXT_PUBLIC_API_BASE=http://localhost:5001
-```
-
-Create `stryker-ai-back/.env` (or set in your shell) with:
-
-```
-GEMINI_API_KEY=your_api_key_here
-PORT=5001
-```
 
 ### Backend: Flask
 
