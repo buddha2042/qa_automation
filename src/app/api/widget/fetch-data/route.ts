@@ -1,34 +1,49 @@
 import { NextResponse } from 'next/server';
+import { normalizeBaseUrl, sanitizeBearerToken } from '@/lib/network';
+
+interface WidgetPayload {
+  datasource?: { fullname?: string };
+  query?: {
+    metadata?: Array<{ jaql?: unknown }>;
+    count?: number;
+  };
+}
+
+interface FetchDataRequest {
+  url?: string;
+  token?: string;
+  widgetPayload?: WidgetPayload;
+}
 
 export async function POST(req: Request) {
   try {
-    const { url, token, widgetPayload } = await req.json();
+    const { url, token, widgetPayload } = (await req.json()) as FetchDataRequest;
 
     if (!url || !token || !widgetPayload) {
-      throw new Error('Missing required parameters');
+      return NextResponse.json(
+        { error: 'Missing required parameters' },
+        { status: 400 }
+      );
     }
 
-    const cleanBaseUrl = url.replace(/\/$/, '');
+    const cleanBaseUrl = normalizeBaseUrl(url);
 
-    /* ===============================
-       BUILD PERFECT JAQL PAYLOAD
-    =============================== */
     const jaqlBody = {
-      datasource: widgetPayload.datasource.fullname,
-      metadata: widgetPayload.query.metadata.map((m: any) => ({
-        jaql: m.jaql
+      datasource: widgetPayload.datasource?.fullname,
+      metadata: (widgetPayload.query?.metadata ?? []).map((m) => ({
+        jaql: m.jaql,
       })),
-      count: widgetPayload.query.count ?? 1000
+      count: widgetPayload.query?.count ?? 1000,
     };
 
     const response = await fetch(`${cleanBaseUrl}/api/v1/jaql`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${token.replace('Bearer ', '')}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${sanitizeBearerToken(token)}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(jaqlBody),
-      cache: 'no-store'
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -39,17 +54,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const result = await response.json();
+    const result = (await response.json()) as { values?: unknown[] };
 
     return NextResponse.json({
       rowCount: result.values?.length ?? 0,
-      data: result.values
+      data: result.values ?? [],
     });
-
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: e.message },
-      { status: 500 }
-    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

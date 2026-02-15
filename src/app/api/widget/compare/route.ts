@@ -1,48 +1,45 @@
 import { NextResponse } from 'next/server';
 
-/**
- * Deeply compares two objects and returns a list of differences
- */
-function getDeepDiff(obj1: any, obj2: any, path = ''): any[] {
-  const diffs: any[] = [];
+type Difference = {
+  path: string;
+  regularValue: unknown;
+  refactorValue: unknown;
+  message: string;
+};
 
-  // Get all unique keys from both objects
-  const allKeys = Array.from(new Set([
-    ...Object.keys(obj1 || {}), 
-    ...Object.keys(obj2 || {})
-  ]));
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function getDeepDiff(obj1: unknown, obj2: unknown, path = ''): Difference[] {
+  const diffs: Difference[] = [];
+  const left = isObject(obj1) ? obj1 : {};
+  const right = isObject(obj2) ? obj2 : {};
+
+  const allKeys = Array.from(new Set([...Object.keys(left), ...Object.keys(right)]));
 
   for (const key of allKeys) {
     const currentPath = path ? `${path}.${key}` : key;
-    const val1 = obj1?.[key];
-    const val2 = obj2?.[key];
+    const val1 = left[key];
+    const val2 = right[key];
 
-    // 1. If both are objects (and not null), recurse
-    if (
-      typeof val1 === 'object' && val1 !== null &&
-      typeof val2 === 'object' && val2 !== null &&
-      !Array.isArray(val1)
-    ) {
+    if (isObject(val1) && isObject(val2)) {
       diffs.push(...getDeepDiff(val1, val2, currentPath));
-    } 
-    // 2. Special handling for Arrays
-    else if (Array.isArray(val1) || Array.isArray(val2)) {
+    } else if (Array.isArray(val1) || Array.isArray(val2)) {
       if (JSON.stringify(val1) !== JSON.stringify(val2)) {
         diffs.push({
           path: currentPath,
           regularValue: val1,
           refactorValue: val2,
-          message: 'Array mismatch'
+          message: 'Array mismatch',
         });
       }
-    }
-    // 3. Primitive values (strings, numbers, booleans)
-    else if (val1 !== val2) {
+    } else if (val1 !== val2) {
       diffs.push({
         path: currentPath,
         regularValue: val1,
         refactorValue: val2,
-        message: 'Value mismatch'
+        message: 'Value mismatch',
       });
     }
   }
@@ -52,27 +49,26 @@ function getDeepDiff(obj1: any, obj2: any, path = ''): any[] {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = (await req.json()) as { regular?: unknown; refactor?: unknown };
     const { regular, refactor } = body;
 
-    if (!regular || !refactor) {
+    if (regular === undefined || refactor === undefined) {
       return NextResponse.json(
-        { error: 'Both regular and refactor payloads are required' }, 
+        { error: 'Both regular and refactor payloads are required' },
         { status: 400 }
       );
     }
 
-    // Run the comparison logic
     const differences = getDeepDiff(regular, refactor);
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       data: differences,
-      match: differences.length === 0 
+      match: differences.length === 0,
     });
-  } catch (error: any) {
-    console.error("Compare Error:", error);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to process comparison: ' + error.message }, 
+      { error: `Failed to process comparison: ${message}` },
       { status: 500 }
     );
   }

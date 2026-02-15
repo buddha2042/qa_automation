@@ -7,7 +7,7 @@ export interface QaRun {
   environment: Environment;
   baseUrl: string;
   createdAt: string;
-  payload: any;
+  payload: unknown;
 }
 
 /**

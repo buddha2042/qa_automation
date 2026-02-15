@@ -3,42 +3,43 @@ const API_BASE_URL = `${BASE_URL}/api`;
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
+    const error = (await response.json().catch(() => ({}))) as { message?: string };
     throw new Error(error.message || `API error: ${response.status} ${response.statusText}`);
   }
   return response.json();
 }
 
 export const SisenseDashboardApi = {
-  getAll: async (page: number = 1, pageSize: number = 10) => {
+  getAll: async (page = 1, pageSize = 10) => {
     const response = await fetch(`${API_BASE_URL}/SisenseDashboards?page=${page}&per_page=${pageSize}`);
     return handleResponse<{
       success: boolean;
-      data: any[];
+      data: unknown[];
       pagination: { total_pages: number };
     }>(response);
   },
 
   getById: async (id: string | number) => {
     const response = await fetch(`${API_BASE_URL}/SisenseDashboards/${id}`);
-    return handleResponse<{ success: boolean; data: any }>(response);
+    return handleResponse<{ success: boolean; data: unknown }>(response);
   },
-  create: async (SisenseDashboardData: any) => {
+
+  create: async (sisenseDashboardData: Record<string, unknown>) => {
     const response = await fetch(`${API_BASE_URL}/SisenseDashboards`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(SisenseDashboardData),
+      body: JSON.stringify(sisenseDashboardData),
     });
-    return handleResponse<{ success: boolean; data: any }>(response);
+    return handleResponse<{ success: boolean; data: unknown }>(response);
   },
 
-  update: async (id: string | number, SisenseDashboardData: any) => {
+  update: async (id: string | number, sisenseDashboardData: Record<string, unknown>) => {
     const response = await fetch(`${API_BASE_URL}/SisenseDashboards/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(SisenseDashboardData),
+      body: JSON.stringify(sisenseDashboardData),
     });
-    return handleResponse<{ success: boolean; data: any }>(response);
+    return handleResponse<{ success: boolean; data: unknown }>(response);
   },
 
   delete: async (id: string | number) => {
@@ -58,16 +59,16 @@ export const documentApi = {
       method: 'POST',
       body: formData,
     });
-    return handleResponse<{ success: boolean; data: any }>(response);
+    return handleResponse<{ success: boolean; data: unknown }>(response);
   },
 
-  saveSisenseDashboard: async (SisenseDashboardData: any) => {
+  saveSisenseDashboard: async (sisenseDashboardData: Record<string, unknown>) => {
     const response = await fetch(`${API_BASE_URL}/save-SisenseDashboard`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(SisenseDashboardData),
+      body: JSON.stringify(sisenseDashboardData),
     });
-    return handleResponse<{ success: boolean; data: any }>(response);
+    return handleResponse<{ success: boolean; data: unknown }>(response);
   },
 };
 

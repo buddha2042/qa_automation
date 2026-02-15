@@ -1,17 +1,28 @@
 import { NextResponse } from 'next/server';
-import { getRunsByRunId } from '@/lib/store'; // in-memory 
+import { getRunsByRunId } from '@/lib/store';
 
-function diffObjects(a: any, b: any, path = ''): any[] {
-  const diffs: any[] = [];
-  const keys = new Set([
-    ...Object.keys(a || {}),
-    ...Object.keys(b || {})
-  ]);
+type DiffItem = {
+  path: string;
+  regular: unknown;
+  refactor: unknown;
+  type: 'MISSING_IN_REGULAR' | 'MISSING_IN_REFACTOR' | 'VALUE_MISMATCH';
+};
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function diffObjects(a: unknown, b: unknown, path = ''): DiffItem[] {
+  const left = isObject(a) ? a : {};
+  const right = isObject(b) ? b : {};
+  const diffs: DiffItem[] = [];
+
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
 
   for (const key of keys) {
     const newPath = path ? `${path}.${key}` : key;
-    const valA = a?.[key];
-    const valB = b?.[key];
+    const valA = left[key];
+    const valB = right[key];
 
     if (valA === undefined) {
       diffs.push({ path: newPath, regular: null, refactor: valB, type: 'MISSING_IN_REGULAR' });
@@ -23,15 +34,10 @@ function diffObjects(a: any, b: any, path = ''): any[] {
       continue;
     }
 
-    if (typeof valA === 'object' && typeof valB === 'object' && valA && valB) {
+    if (isObject(valA) && isObject(valB)) {
       diffs.push(...diffObjects(valA, valB, newPath));
-    } else if (valA !== valB) {
-      diffs.push({
-        path: newPath,
-        regular: valA,
-        refactor: valB,
-        type: 'VALUE_MISMATCH'
-      });
+    } else if (JSON.stringify(valA) !== JSON.stringify(valB)) {
+      diffs.push({ path: newPath, regular: valA, refactor: valB, type: 'VALUE_MISMATCH' });
     }
   }
 
@@ -39,28 +45,26 @@ function diffObjects(a: any, b: any, path = ''): any[] {
 }
 
 export async function POST(req: Request) {
-  const { runId } = await req.json();
+  const { runId } = (await req.json()) as { runId?: string };
 
-  const runs = getRunsByRunId(runId);
-  const regular = runs.find(r => r.environment === 'regular');
-  const refactor = runs.find(r => r.environment === 'refactor');
-
-  if (!regular || !refactor) {
-    return NextResponse.json(
-      { error: 'Both runs required' },
-      { status: 400 }
-    );
+  if (!runId) {
+    return NextResponse.json({ error: 'runId is required' }, { status: 400 });
   }
 
-  const diffs = diffObjects(
-    regular.payload,
-    refactor.payload
-  );
+  const runs = getRunsByRunId(runId);
+  const regular = runs.find((r) => r.environment === 'regular');
+  const refactor = runs.find((r) => r.environment === 'refactor');
+
+  if (!regular || !refactor) {
+    return NextResponse.json({ error: 'Both runs required' }, { status: 400 });
+  }
+
+  const diffs = diffObjects(regular.payload, refactor.payload);
 
   return NextResponse.json({
     summary: {
-      totalDifferences: diffs.length
+      totalDifferences: diffs.length,
     },
-    differences: diffs
+    differences: diffs,
   });
 }

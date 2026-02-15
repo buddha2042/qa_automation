@@ -2,14 +2,18 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react';
 
-/* ============================================================
-   TYPES & INTERFACES
-   ============================================================ */
+export type JsonValue =
+  | null
+  | boolean
+  | number
+  | string
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 export interface ComparisonItem {
   path: string;
-  regularValue: any;
-  refactorValue: any;
+  regularValue: JsonValue | undefined;
+  refactorValue: JsonValue | undefined;
   isMatch: boolean;
 }
 
@@ -18,7 +22,6 @@ export interface QaInputs {
   regToken: string;
   regDashId: string;
   regWidgetId: string;
-
   refUrl: string;
   refToken: string;
   refDashId: string;
@@ -34,22 +37,13 @@ export type QaPhase =
   | 'DATA_COMPARE_DONE';
 
 export interface QaState {
-  /* Connection & Auth */
   inputs: QaInputs | null;
   jwtToken: string | null;
-
-  /* Widget Logic (Phase 1) */
-  regularData: any | null;
-  refactorData: any | null;
+  regularData: JsonValue | null;
+  refactorData: JsonValue | null;
   comparisonReport: ComparisonItem[];
-
-  /* Phase Control */
   phase: QaPhase;
-
-  /* Metadata */
   createdAt: string | null;
-
-  /* Data Comparison Results (Phase 2) */
   dataCompareResult?: {
     regularRowCount: number;
     refactorRowCount: number;
@@ -57,27 +51,11 @@ export interface QaState {
   };
 }
 
-/* ============================================================
-   CONTEXT SHAPE
-   ============================================================ */
-
 interface QaContextType extends QaState {
-  /** Replaces the entire state object */
   setQaState: React.Dispatch<React.SetStateAction<QaState>>;
-
-  /** 
-   * Preferred Method: Merges changes into the current state.
-   * Special handling for 'inputs' to prevent token data-loss.
-   */
   updateQaState: (partial: Partial<QaState>) => void;
-
-  /** Resets the entire lab back to INIT state */
   resetQa: () => void;
 }
-
-/* ============================================================
-   DEFAULT STATE
-   ============================================================ */
 
 const defaultState: QaState = {
   inputs: null,
@@ -86,34 +64,18 @@ const defaultState: QaState = {
   refactorData: null,
   comparisonReport: [],
   phase: 'INIT',
-  createdAt: null
+  createdAt: null,
 };
 
-/* ============================================================
-   CONTEXT CREATION
-   ============================================================ */
-
 const QaContext = createContext<QaContextType | null>(null);
-
-/* ============================================================
-   PROVIDER COMPONENT
-   ============================================================ */
 
 export const QaProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<QaState>(defaultState);
 
-  /**
-   * updateQaState Fix:
-   * Standard React shallow merging ({...prev, ...partial}) wipes out
-   * nested objects. If we only update inputs.regUrl, we would lose
-   * inputs.regToken. This logic ensures nested 'inputs' are merged properly.
-   */
   const updateQaState = (partial: Partial<QaState>) => {
     setState((prev) => {
-      // 1. Create a shallow copy of the state with the top-level changes
       const newState = { ...prev, ...partial };
 
-      // 2. If 'inputs' is being updated, merge it deeply with the old inputs
       if (partial.inputs && prev.inputs) {
         newState.inputs = {
           ...prev.inputs,
@@ -125,9 +87,7 @@ export const QaProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const resetQa = () => {
-    setState(defaultState);
-  };
+  const resetQa = () => setState(defaultState);
 
   return (
     <QaContext.Provider
@@ -142,10 +102,6 @@ export const QaProvider = ({ children }: { children: ReactNode }) => {
     </QaContext.Provider>
   );
 };
-
-/* ============================================================
-   CUSTOM HOOK
-   ============================================================ */
 
 export const useQa = () => {
   const context = useContext(QaContext);
