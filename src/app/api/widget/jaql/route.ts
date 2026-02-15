@@ -1,140 +1,144 @@
 import { NextResponse } from 'next/server';
+import { normalizeBaseUrl, sanitizeBearerToken } from '@/lib/network';
+
+interface JaqlMetadataItem {
+  panel?: string;
+  jaql?: {
+    dim?: string;
+    datasource?: unknown;
+    pv?: Record<string, number>;
+  };
+  field?: {
+    index?: number;
+    id?: string;
+  };
+}
+
+interface JaqlPayload {
+  datasource?: {
+    fullname?: string;
+  };
+  metadata?: JaqlMetadataItem[];
+}
+
+interface JaqlRequestBody {
+  baseUrl?: string;
+  token?: string;
+  datasource?: string;
+  jaql?: JaqlPayload;
+}
 
 export async function POST(req: Request) {
-  console.log("=================================================");
-  console.log("[SISENSE PROXY] API CALLED");
-  console.log("Time:", new Date().toISOString());
-
-  // Timeout protection (45 seconds)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 45000);
 
   try {
-    const startTime = Date.now();
+    const body = (await req.json()) as JaqlRequestBody;
+    const { baseUrl, token, datasource, jaql } = body;
 
-    const body = await req.json();
-    let { baseUrl, token, datasource, jaql } = body;
+    if (!baseUrl || !token || !datasource || !jaql) {
+      return NextResponse.json(
+        { error: 'baseUrl, token, datasource, and jaql are required' },
+        { status: 400 }
+      );
+    }
 
-    console.log("[SISENSE PROXY] Base URL:", baseUrl);
-    console.log("[SISENSE PROXY] Datasource:", datasource);
-    console.log("[SISENSE PROXY] Metadata Count:", jaql?.metadata?.length || 0);
-
-    // DATASOURCE NAME
-    const urlSegment = datasource?.includes('/')
-      ? datasource.split('/').pop()
+    const safeBaseUrl = normalizeBaseUrl(baseUrl);
+    const urlSegment = datasource.includes('/')
+      ? datasource.split('/').pop() ?? datasource
       : datasource;
+    const encodedDs = encodeURIComponent(urlSegment);
+    const url = `${safeBaseUrl}/api/datasources/${encodedDs}/jaql`;
 
-    const encodedDs = encodeURIComponent(urlSegment || '');
-    const url = `${baseUrl}/api/datasources/${encodedDs}/jaql`;
-
-    console.log("[SISENSE PROXY] Final URL:", url);
-
-    // JAQL TRANSFORMATIONS
-    if (jaql && jaql.metadata) {
-      if (
-        jaql.datasource &&
-        !jaql.datasource.fullname.startsWith('localhost/')
-      ) {
+    if (jaql.metadata) {
+      if (jaql.datasource?.fullname && !jaql.datasource.fullname.startsWith('localhost/')) {
         jaql.datasource.fullname = `localhost/${jaql.datasource.fullname}`;
       }
 
-      jaql.metadata = jaql.metadata.map((item: any, index: number) => {
-        if (item.panel === 'categories') item.panel = 'rows';
+      jaql.metadata = jaql.metadata.map((item, index) => {
+        const mapped: JaqlMetadataItem = { ...item };
 
-        if (item.panel !== 'scope' && item.field) {
-          item.field.index = index;
-          if (item.jaql?.dim) {
-            item.field.id = item.jaql.dim;
-          }
-        }
+        if (mapped.panel === 'categories') mapped.panel = 'rows';
 
-        if (item.panel === 'rows' && item.jaql) {
-          item.jaql.pv = {
-            "Visible in View>Yes": 2,
-            "Aggregation>Count": 2
+        if (mapped.panel !== 'scope' && mapped.field) {
+          mapped.field = {
+            ...mapped.field,
+            index,
+            id: mapped.jaql?.dim ?? mapped.field.id,
           };
         }
 
-        if (item.panel === 'scope' && item.jaql && !item.jaql.datasource) {
-          item.jaql.datasource = jaql.datasource;
+        if (mapped.panel === 'rows' && mapped.jaql) {
+          mapped.jaql = {
+            ...mapped.jaql,
+            pv: {
+              'Visible in View>Yes': 2,
+              'Aggregation>Count': 2,
+            },
+          };
         }
 
-        return item;
+        if (mapped.panel === 'scope' && mapped.jaql && !mapped.jaql.datasource) {
+          mapped.jaql = {
+            ...mapped.jaql,
+            datasource: jaql.datasource,
+          };
+        }
+
+        return mapped;
       });
     }
 
-    console.log("[SISENSE PROXY] Executing JAQL request...");
-
-    //  FETCH SISENSE
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`
+        Accept: 'application/json',
+        Authorization: `Bearer ${sanitizeBearerToken(token)}`,
       },
       body: JSON.stringify(jaql),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    const duration = Date.now() - startTime;
-    console.log(`[SISENSE PROXY] Response received in ${duration}ms`);
-    console.log("[SISENSE PROXY] HTTP Status:", response.status);
+    const contentType = response.headers.get('content-type');
 
-    //  HANDLE NON-JSON RESPONSES
-    const contentType = response.headers.get("content-type");
-
-    if (!contentType || !contentType.includes("application/json")) {
-      const errorText = await response.text();
-      console.error("[SISENSE PROXY] Non-JSON Response:");
-      console.error(errorText.substring(0, 300));
-
+    if (!contentType || !contentType.includes('application/json')) {
       return NextResponse.json(
-        { error: "Sisense returned invalid format (check Base URL or Datasource)." },
+        { error: 'Sisense returned an invalid format (non-JSON response).' },
         { status: response.status }
       );
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      values?: unknown[];
+      error?: { message?: string };
+      message?: string;
+    };
 
     if (!response.ok) {
-      console.error("[SISENSE PROXY] Sisense API Error:");
-      console.error(JSON.stringify(data, null, 2));
-
       return NextResponse.json(
         {
-          error: data?.error?.message || data?.message || "Sisense Execution Error",
-          details: data
+          error: data.error?.message ?? data.message ?? 'Sisense execution error',
+          details: data,
         },
         { status: response.status }
       );
     }
 
-    console.log(`[SISENSE PROXY] SUCCESS - Rows Received: ${data?.values?.length || 0}`);
-    console.log("=================================================");
-
     return NextResponse.json({ data });
-
-  } catch (error: any) {
+  } catch (error) {
     clearTimeout(timeoutId);
 
-    if (error.name === 'AbortError') {
-      console.error("[SISENSE PROXY]  TIMEOUT after 45 seconds");
-      console.log("=================================================");
+    if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
-        { error: "Sisense query timed out (Request took too long)." },
+        { error: 'Sisense query timed out (request took too long).' },
         { status: 504 }
       );
     }
 
-    console.error("[SISENSE PROXY] CRITICAL ERROR:", error.message);
-    console.log("=================================================");
-
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
