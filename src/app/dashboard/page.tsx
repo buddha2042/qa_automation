@@ -3,6 +3,7 @@
 import { FormEvent, ChangeEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQa } from '@/context/QaContext';
+import AppHeader from '@/components/AppHeader';
 
 interface DashboardSetupForm {
   oid: string;
@@ -89,24 +90,7 @@ export default function DashboardWelcomePage() {
         <div className="absolute bottom-[-10%] right-[10%] w-[40%] h-[40%] bg-blue-50/60 blur-[100px] rounded-full" />
       </div>
 
-      <nav className="w-full border-b border-slate-200 bg-white/60 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div
-            onClick={() => router.push('/')}
-            className="cursor-pointer hover:opacity-70 transition-opacity flex items-center gap-2 group"
-          >
-            <div className="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center group-hover:border-slate-400">
-              <svg className="w-3 h-3 text-slate-400 group-hover:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover:text-slate-600">Back to Hub</span>
-          </div>
-          <div className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-md">
-            Dashboard Inspector
-          </div>
-        </div>
-      </nav>
+      <AppHeader title="DXC Quality Lab" subtitle="Dashboard Setup" backHref="/" />
 
       <main className="flex-grow flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-2xl bg-white border border-slate-200 rounded-[32px] shadow-xl shadow-slate-200/50 p-8 md:p-10 relative overflow-hidden">

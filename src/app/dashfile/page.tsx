@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import AppHeader from '@/components/AppHeader';
 
 type Environment = 'regular' | 'refactor';
 
@@ -40,8 +40,6 @@ const isValidHttpUrl = (value: string) => {
 };
 
 export default function QaCapturePage() {
-  const router = useRouter();
-
   const [config, setConfig] = useState<ConfigState>({
     regular: { url: '', token: '' },
     refactor: { url: '', token: '' },
@@ -144,8 +142,9 @@ export default function QaCapturePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      <AppHeader title="DXC Quality Lab" subtitle="Master Informer" backHref="/" />
+      <div className="max-w-7xl mx-auto p-8">
         <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end border-b border-gray-800 pb-6 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white tracking-tight">Sisense Widget Inventory</h1>
@@ -161,9 +160,6 @@ export default function QaCapturePage() {
                 Export CSV
               </button>
             )}
-            <button onClick={() => router.push('/')} className="text-sm bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-gray-300 transition-colors">
-              ← Back
-            </button>
           </div>
         </header>
 

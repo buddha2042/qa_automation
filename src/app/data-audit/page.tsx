@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQa } from '@/context/QaContext';
-import { FileJson, XCircle, Activity, Layers, RefreshCcw, Download, Check, AlertTriangle, ArrowLeft, Zap } from 'lucide-react';
+import AppHeader from '@/components/AppHeader';
+import { XCircle, Activity, Layers, RefreshCcw, Download, Check, AlertTriangle, ArrowLeft, Zap } from 'lucide-react';
 
 type Env = 'regular' | 'refactor';
 type RowValue = unknown[] | string | number | boolean | null | Record<string, unknown>;
@@ -40,6 +41,40 @@ interface DataComparisonResult {
   mismatchCount: number;
   diffRows: CompareRow[];
 }
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const toCellText = (value: unknown): string => {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '[unserializable]';
+  }
+};
+
+const normalizeResultRows = (values: RowValue[] | undefined, columnCount: number): string[][] => {
+  if (!values) return [];
+
+  return values.map((row) => {
+    const arr = Array.isArray(row) ? row : [row];
+    const normalized = arr.slice(0, columnCount).map((cell) => {
+      if (isObjectRecord(cell)) {
+        const obj = cell as { text?: unknown; data?: unknown };
+        if (typeof obj.text === 'string') return obj.text;
+        if (obj.data !== undefined && obj.data !== null) return String(obj.data);
+      }
+      return toCellText(cell);
+    });
+
+    while (normalized.length < columnCount) normalized.push('');
+    return normalized;
+  });
+};
 
 const prepareJaqlBody = (widgetJson: WidgetComparableJson | null) => {
   if (!widgetJson?.panels) return null;
@@ -83,6 +118,30 @@ export default function DataAuditPage() {
   const [loading, setLoading] = useState({ regular: false, refactor: false });
   const [error, setError] = useState('');
   const [comparison, setComparison] = useState<DataComparisonResult | null>(null);
+
+  const tableColumns = useMemo(() => {
+    const rows = regularWidget?.panels?.find((p) => p.name === 'rows')?.items ?? [];
+    const values = regularWidget?.panels?.find((p) => p.name === 'values')?.items ?? [];
+
+    return [
+      ...rows.map((item, idx) => {
+        const jaql = item.jaql as { title?: string; dim?: string } | undefined;
+        return jaql?.title || jaql?.dim || `Row ${idx + 1}`;
+      }),
+      ...values.map((item, idx) => {
+        const jaql = item.jaql as { title?: string; dim?: string } | undefined;
+        return jaql?.title || jaql?.dim || `Value ${idx + 1}`;
+      }),
+    ];
+  }, [regularWidget]);
+
+  const directRows = useMemo(
+    () => ({
+      regular: normalizeResultRows(results.regular?.values, tableColumns.length || 1),
+      refactor: normalizeResultRows(results.refactor?.values, tableColumns.length || 1),
+    }),
+    [results, tableColumns.length]
+  );
 
   const fetchData = async (env: Env) => {
     if (missingContext || !inputs) {
@@ -217,23 +276,11 @@ export default function DataAuditPage() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-20 font-sans">
-      <div className="bg-white border-b px-8 py-10 shadow-sm">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <span className="bg-blue-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Phase 2</span>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight italic">Data Audit</h1>
-            </div>
-            <p className="text-slate-500 text-sm font-medium">Compare Legacy vs Refactor output data using the validated widget metadata request.</p>
-          </div>
-          <button
-            onClick={() => router.push('/widget')}
-            className="bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest"
-          >
-            Back to Widget
-          </button>
-        </div>
-      </div>
+      <AppHeader
+        title="DXC Quality Lab"
+        subtitle="Data Audit"
+        backHref="/widget"
+      />
 
       <main className="max-w-7xl mx-auto p-8 space-y-10">
         <section className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
@@ -260,20 +307,18 @@ export default function DataAuditPage() {
           ))}
         </div>
 
-        {!comparison && (
+        {(results.regular || results.refactor) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {(['regular', 'refactor'] as const).map((env) => (
-              <div key={env} className="bg-[#0F172A] rounded-[2.5rem] h-[300px] overflow-hidden shadow-2xl flex flex-col border border-slate-800">
-                <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/50 flex justify-between">
-                  <span className="text-[10px] font-black text-slate-400 uppercase italic flex items-center gap-2">
-                    <FileJson size={14} className="text-blue-400" /> {env}_payload.json
-                  </span>
-                </div>
-                <pre className="p-6 text-[11px] text-emerald-400 font-mono overflow-auto flex-1 custom-scrollbar">
-                  {results[env] ? JSON.stringify(results[env]?.values, null, 2) : '// Data not yet loaded...'}
-                </pre>
-              </div>
-            ))}
+            <ResultPivotPanel
+              label="Legacy Data Table"
+              rows={directRows.regular}
+              columns={tableColumns}
+            />
+            <ResultPivotPanel
+              label="Refactor Data Table"
+              rows={directRows.refactor}
+              columns={tableColumns}
+            />
           </div>
         )}
 
@@ -336,14 +381,10 @@ export default function DataAuditPage() {
                           )}
                         </td>
                         <td className="p-6 align-top">
-                          <pre className={`text-[11px] font-mono leading-relaxed ${!row.isRowMatch ? 'text-rose-600' : 'text-slate-600'}`}>
-                            {row.reg ? JSON.stringify(row.reg, null, 2) : <span className="italic text-slate-300 text-[10px]">NULL</span>}
-                          </pre>
+                          <RowValueTable value={row.reg} mismatch={!row.isRowMatch} />
                         </td>
                         <td className="p-6 align-top">
-                          <pre className={`text-[11px] font-mono leading-relaxed ${!row.isRowMatch ? 'text-rose-600 font-bold' : 'text-slate-600'}`}>
-                            {row.ref ? JSON.stringify(row.ref, null, 2) : <span className="italic text-slate-300 text-[10px]">NULL</span>}
-                          </pre>
+                          <RowValueTable value={row.ref} mismatch={!row.isRowMatch} />
                         </td>
                       </tr>
                     ))}
@@ -384,11 +425,132 @@ function ContextDetail({ label, url, ds }: { label: string; url?: string; ds?: s
   );
 }
 
+function ResultPivotPanel({
+  label,
+  columns,
+  rows,
+}: {
+  label: string;
+  columns: string[];
+  rows: string[][];
+}) {
+  return (
+    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-200">
+      <div className="mb-3">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{label}</span>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 overflow-auto max-h-[340px]">
+        <table className="w-full text-[12px]">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              {(columns.length ? columns : ['Value']).map((col) => (
+                <th key={col} className="text-left p-2 font-bold text-slate-600 whitespace-nowrap">
+                  {col}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length > 0 ? (
+              rows.map((row, idx) => (
+                <tr key={idx} className="border-b last:border-b-0">
+                  {(columns.length ? row : [row.join(', ')]).map((cell, cIdx) => (
+                    <td key={`${idx}-${cIdx}`} className="p-2 text-slate-700 font-mono">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="p-3 text-slate-400 italic text-[12px]" colSpan={columns.length || 1}>
+                  No rows loaded yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function StatBox({ label, val, color = 'text-slate-900' }: { label: string; val: string | number; color?: string }) {
   return (
     <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center shadow-sm">
       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-3 italic">{label}</p>
       <p className={`text-4xl font-black tracking-tighter ${color}`}>{val}</p>
+    </div>
+  );
+}
+
+function RowValueTable({ value, mismatch }: { value: RowValue | null; mismatch: boolean }) {
+  if (value === null) {
+    return <span className="italic text-slate-300 text-[10px]">NULL</span>;
+  }
+
+  if (Array.isArray(value) && value.length > 0 && value.every(isObjectRecord)) {
+    const columns = Array.from(new Set(value.flatMap((row) => Object.keys(row))));
+    return (
+      <div className="overflow-auto max-h-[260px] rounded-xl border border-slate-200">
+        <table className="w-full text-[11px]">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              {columns.map((col) => (
+                <th key={col} className="text-left p-2 font-bold text-slate-500 whitespace-nowrap">
+                  {col}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {value.map((row, idx) => (
+              <tr key={idx} className="border-b last:border-b-0">
+                {columns.map((col) => (
+                  <td
+                    key={col}
+                    className={`p-2 align-top font-mono ${mismatch ? 'text-rose-600' : 'text-slate-600'}`}
+                  >
+                    {toCellText(row[col])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  if (isObjectRecord(value)) {
+    return (
+      <div className="overflow-auto max-h-[260px] rounded-xl border border-slate-200">
+        <table className="w-full text-[11px]">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              <th className="text-left p-2 font-bold text-slate-500">Field</th>
+              <th className="text-left p-2 font-bold text-slate-500">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(value).map(([k, v]) => (
+              <tr key={k} className="border-b last:border-b-0">
+                <td className="p-2 align-top text-slate-600 font-bold">{k}</td>
+                <td className={`p-2 align-top font-mono ${mismatch ? 'text-rose-600' : 'text-slate-600'}`}>
+                  {toCellText(v)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`text-[11px] font-mono ${mismatch ? 'text-rose-600' : 'text-slate-600'}`}>
+      {toCellText(value)}
     </div>
   );
 }
