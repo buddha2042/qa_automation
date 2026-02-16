@@ -4,9 +4,11 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/AppHeader';
 import { useQa } from '@/context/QaContext';
-import { CheckCircle2, XCircle, Link2 } from 'lucide-react';
+import { CheckCircle2, Link2, Download, ChevronDown, ChevronRight } from 'lucide-react';
 
 type Environment = 'regular' | 'refactor';
+type MatchBasis = 'dashboard_id' | 'dashboard_title';
+type WidgetRunStatus = 'NOT_RUN' | 'RUNNING' | 'MATCH' | 'MISMATCH' | 'ERROR';
 
 interface EnvConfig {
   url: string;
@@ -25,7 +27,11 @@ interface SisenseDashboard {
     columns?: Array<{
       cells?: Array<{
         subcells?: Array<{
-          elements?: Array<{ widgetid?: string }>;
+          elements?: Array<{
+            widgetid?: string;
+            title?: string;
+            name?: string;
+          }>;
         }>;
       }>;
     }>;
@@ -36,6 +42,7 @@ interface DashboardItem {
   dashboardId: string;
   title: string;
   widgets: string[];
+  widgetTitles: Record<string, string>;
 }
 
 interface MatchedDashboard {
@@ -43,10 +50,40 @@ interface MatchedDashboard {
   refactorDashboardId: string;
   regularTitle: string;
   refactorTitle: string;
-  regularWidgets: string[];
-  refactorWidgets: string[];
   matchedWidgets: string[];
-  matchBasis: 'dashboard_id' | 'dashboard_title';
+  regularWidgetTitles: Record<string, string>;
+  refactorWidgetTitles: Record<string, string>;
+  matchBasis: MatchBasis;
+}
+
+interface WidgetCompareResult {
+  key: string;
+  regularDashboardId: string;
+  refactorDashboardId: string;
+  widgetId: string;
+  status: Exclude<WidgetRunStatus, 'NOT_RUN' | 'RUNNING'>;
+  diffCount: number;
+  reason?: string;
+  comparisons?: Array<{
+    path: string;
+    status: 'MATCH' | 'MISMATCH';
+    regularValue: string;
+    refactorValue: string;
+  }>;
+  outputCompare?: {
+    legacyHeaders: string[];
+    refactorHeaders: string[];
+    legacyRows: string[][];
+    refactorRows: string[][];
+    rows: Array<{
+      status: 'MATCH' | 'MISMATCH';
+      legacyRowKey: string;
+      refactorRowKey: string;
+      legacyValues: string[];
+      refactorValues: string[];
+    }>;
+    mismatchRowCount: number;
+  };
 }
 
 const isValidHttpUrl = (value: string) => {
@@ -58,28 +95,42 @@ const isValidHttpUrl = (value: string) => {
   }
 };
 
-const extractWidgetIds = (layout?: SisenseDashboard['layout']): string[] => {
-  const ids: string[] = [];
-  if (!layout?.columns) return ids;
+const normalizeTitle = (title: string): string =>
+  title.trim().toLowerCase().replace(/\s+/g, ' ');
+
+const extractWidgetMeta = (layout?: SisenseDashboard['layout']) => {
+  const ids = new Set<string>();
+  const titles: Record<string, string> = {};
+  if (!layout?.columns) return { ids: [], titles };
 
   layout.columns.forEach((col) => {
     col.cells?.forEach((cell) => {
       cell.subcells?.forEach((sub) => {
         sub.elements?.forEach((el) => {
-          if (el.widgetid) ids.push(el.widgetid);
+          if (!el.widgetid) return;
+          ids.add(el.widgetid);
+          const candidateTitle = typeof el.title === 'string' ? el.title : el.name;
+          if (typeof candidateTitle === 'string' && candidateTitle.trim()) {
+            titles[el.widgetid] = candidateTitle.trim();
+          }
         });
       });
     });
   });
 
-  return ids;
+  return {
+    ids: Array.from(ids),
+    titles,
+  };
 };
 
-const normalizeTitle = (title: string): string =>
-  title.trim().toLowerCase().replace(/\s+/g, ' ');
+const widgetKey = (regularDashboardId: string, refactorDashboardId: string, widgetId: string): string =>
+  `${regularDashboardId}::${refactorDashboardId}::${widgetId}`;
 
-const getWidgetDisplayTitle = (widgetId: string): string =>
-  `Widget ${widgetId.slice(0, 8)}${widgetId.length > 8 ? '...' : ''}`;
+const toCsv = (rows: string[][]): string =>
+  rows
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
+    .join('\n');
 
 export default function DashboardInspectorPage() {
   const router = useRouter();
@@ -95,10 +146,14 @@ export default function DashboardInspectorPage() {
     refactor: [],
   });
 
-  const [loading, setLoading] = useState(false);
+  const [compareResults, setCompareResults] = useState<Record<string, WidgetCompareResult>>({});
+  const [runningWidgets, setRunningWidgets] = useState<Record<string, boolean>>({});
+  const [expandedDashboards, setExpandedDashboards] = useState<Record<string, boolean>>({});
+
+  const [loadingMatches, setLoadingMatches] = useState(false);
   const [error, setError] = useState('');
 
-  const canRun =
+  const canFetchMatches =
     isValidHttpUrl(config.regular.url.trim()) &&
     isValidHttpUrl(config.refactor.url.trim()) &&
     config.regular.token.trim().length > 20 &&
@@ -111,6 +166,7 @@ export default function DashboardInspectorPage() {
 
     const regularById = new Map(inventories.regular.map((d) => [d.dashboardId, d]));
     const regularByTitle = new Map<string, DashboardItem[]>();
+
     for (const dash of inventories.regular) {
       const key = normalizeTitle(dash.title);
       const bucket = regularByTitle.get(key) ?? [];
@@ -119,95 +175,95 @@ export default function DashboardInspectorPage() {
     }
 
     const addMatch = (
-      reg: DashboardItem,
-      ref: DashboardItem,
-      matchBasis: 'dashboard_id' | 'dashboard_title'
+      regularDash: DashboardItem,
+      refactorDash: DashboardItem,
+      matchBasis: MatchBasis
     ) => {
-      const refWidgetSet = new Set(ref.widgets);
-      const matchedWidgets = reg.widgets.filter((wid) => refWidgetSet.has(wid));
+      const refWidgetSet = new Set(refactorDash.widgets);
+      const matchedWidgets = regularDash.widgets.filter((id) => refWidgetSet.has(id));
 
-      usedRegularIds.add(reg.dashboardId);
-      usedRefactorIds.add(ref.dashboardId);
+      usedRegularIds.add(regularDash.dashboardId);
+      usedRefactorIds.add(refactorDash.dashboardId);
+
       results.push({
-        regularDashboardId: reg.dashboardId,
-        refactorDashboardId: ref.dashboardId,
-        regularTitle: reg.title,
-        refactorTitle: ref.title,
-        regularWidgets: reg.widgets,
-        refactorWidgets: ref.widgets,
+        regularDashboardId: regularDash.dashboardId,
+        refactorDashboardId: refactorDash.dashboardId,
+        regularTitle: regularDash.title,
+        refactorTitle: refactorDash.title,
         matchedWidgets,
+        regularWidgetTitles: regularDash.widgetTitles,
+        refactorWidgetTitles: refactorDash.widgetTitles,
         matchBasis,
       });
     };
 
-    // Pass 1: exact dashboard ID matches.
-    for (const ref of inventories.refactor) {
-      const reg = regularById.get(ref.dashboardId);
-      if (!reg) continue;
-      addMatch(reg, ref, 'dashboard_id');
+    for (const refDash of inventories.refactor) {
+      const regDash = regularById.get(refDash.dashboardId);
+      if (!regDash) continue;
+      addMatch(regDash, refDash, 'dashboard_id');
     }
 
-    // Pass 2: title matches for dashboards not matched by ID.
-    for (const ref of inventories.refactor) {
-      if (usedRefactorIds.has(ref.dashboardId)) continue;
-
-      const key = normalizeTitle(ref.title);
-      const candidates = regularByTitle.get(key) ?? [];
-      const reg = candidates.find((item) => !usedRegularIds.has(item.dashboardId));
-      if (!reg) continue;
-
-      addMatch(reg, ref, 'dashboard_title');
+    for (const refDash of inventories.refactor) {
+      if (usedRefactorIds.has(refDash.dashboardId)) continue;
+      const candidates = regularByTitle.get(normalizeTitle(refDash.title)) ?? [];
+      const regDash = candidates.find((d) => !usedRegularIds.has(d.dashboardId));
+      if (!regDash) continue;
+      addMatch(regDash, refDash, 'dashboard_title');
     }
 
     return results.sort((a, b) => b.matchedWidgets.length - a.matchedWidgets.length);
   }, [inventories]);
 
   const summary = useMemo(() => {
-    const matchedDashboardCount = matchedDashboards.length;
-    const totalMatchedWidgets = matchedDashboards.reduce(
-      (sum, dash) => sum + dash.matchedWidgets.length,
-      0
-    );
+    const compared = Object.keys(compareResults).length;
+    const matched = Object.values(compareResults).filter((r) => r.status === 'MATCH').length;
+    const mismatched = Object.values(compareResults).filter((r) => r.status === 'MISMATCH').length;
+    const errors = Object.values(compareResults).filter((r) => r.status === 'ERROR').length;
 
     return {
       regularDashboards: inventories.regular.length,
       refactorDashboards: inventories.refactor.length,
-      matchedDashboardCount,
-      totalMatchedWidgets,
+      matchedDashboards: matchedDashboards.length,
+      matchedWidgets: matchedDashboards.reduce((sum, dash) => sum + dash.matchedWidgets.length, 0),
+      compared,
+      matched,
+      mismatched,
+      errors,
     };
-  }, [inventories, matchedDashboards]);
+  }, [inventories, matchedDashboards, compareResults]);
 
   const fetchEnvDashboards = async (env: Environment): Promise<DashboardItem[]> => {
     const { url, token } = config[env];
 
-    const res = await fetch('/api/runs', {
+    const response = await fetch('/api/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        baseUrl: url.trim(),
-        token: token.trim(),
-      }),
+      body: JSON.stringify({ baseUrl: url.trim(), token: token.trim() }),
     });
 
-    const json = (await res.json()) as { data?: unknown; error?: string };
-    if (!res.ok) throw new Error(json.error || `Failed to fetch ${env} dashboards`);
+    const json = (await response.json()) as { data?: unknown; error?: string };
+    if (!response.ok) throw new Error(json.error || `Failed to fetch ${env} dashboards`);
 
     const dashboards = Array.isArray(json.data) ? (json.data as SisenseDashboard[]) : [];
 
-    return dashboards.map((dash) => ({
-      dashboardId: dash._id,
-      title: dash.title,
-      widgets: extractWidgetIds(dash.layout),
-    }));
+    return dashboards.map((dash) => {
+      const widgetMeta = extractWidgetMeta(dash.layout);
+      return {
+        dashboardId: dash._id,
+        title: dash.title,
+        widgets: widgetMeta.ids,
+        widgetTitles: widgetMeta.titles,
+      };
+    });
   };
 
-  const runDashboardInspect = async () => {
-    if (!canRun) {
+  const fetchMatches = async () => {
+    if (!canFetchMatches) {
       setError('Please enter valid URLs and tokens for both environments.');
       return;
     }
 
-    setLoading(true);
+    setLoadingMatches(true);
     setError('');
 
     try {
@@ -217,19 +273,166 @@ export default function DashboardInspectorPage() {
       ]);
 
       setInventories({ regular, refactor });
+      setCompareResults({});
+      setRunningWidgets({});
+      setExpandedDashboards({});
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(message);
     } finally {
-      setLoading(false);
+      setLoadingMatches(false);
     }
   };
 
-  const inspectWidget = (
+  const compareSingleWidget = async (
     regularDashboardId: string,
     refactorDashboardId: string,
     widgetId: string
   ) => {
+    if (!canFetchMatches) {
+      setError('Please enter valid URLs and tokens for both environments.');
+      return;
+    }
+
+    const key = widgetKey(regularDashboardId, refactorDashboardId, widgetId);
+    if (runningWidgets[key]) {
+      return;
+    }
+
+    setError('');
+    setRunningWidgets((prev) => ({ ...prev, [key]: true }));
+
+    try {
+      const response = await fetch('/api/dashboard/compare/widget-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          regular: {
+            url: config.regular.url.trim(),
+            token: config.regular.token.trim(),
+          },
+          refactor: {
+            url: config.refactor.url.trim(),
+            token: config.refactor.token.trim(),
+          },
+          selections: [{ key, regularDashboardId, refactorDashboardId, widgetId }],
+        }),
+      });
+
+      const json = (await response.json()) as {
+        data?: WidgetCompareResult[];
+        error?: string;
+      };
+
+      if (!response.ok || !json.data) {
+        throw new Error(json.error || 'Failed to compare widget');
+      }
+
+      const [item] = json.data as WidgetCompareResult[];
+      if (item) {
+        setCompareResults((prev) => ({ ...prev, [item.key]: item }));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+    } finally {
+      setRunningWidgets((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const exportComparedCsv = () => {
+    const rows = Object.values(compareResults);
+    if (rows.length === 0) {
+      setError('No compared widgets available to export yet.');
+      return;
+    }
+
+    const lines: string[][] = [
+      [
+        'Regular Dashboard ID',
+        'Refactor Dashboard ID',
+        'Widget ID',
+        'Status',
+        'Diff Count',
+        'Reason',
+      ],
+      ...rows.map((r) => [
+        r.regularDashboardId,
+        r.refactorDashboardId,
+        r.widgetId,
+        r.status,
+        String(r.diffCount),
+        r.reason ?? '',
+      ]),
+    ];
+
+    const csv = toCsv(lines);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `dashboard_widget_compare_${Date.now()}.csv`;
+    link.click();
+  };
+
+  const exportWidgetProofCsv = (result: WidgetCompareResult) => {
+    const outputCompare = result.outputCompare;
+    let csv = '';
+
+    if (
+      outputCompare &&
+      (outputCompare.rows.length > 0 ||
+        outputCompare.legacyRows.length > 0 ||
+        outputCompare.refactorRows.length > 0)
+    ) {
+      const headers = [
+        'Status',
+        'Legacy Row Key',
+        'Refactor Row Key',
+        ...outputCompare.legacyHeaders.map((h) => `Legacy - ${h}`),
+        ...outputCompare.refactorHeaders.map((h) => `Refactor - ${h}`),
+      ];
+
+      const rows = outputCompare.rows.map((row) => {
+        const legacyCells = outputCompare.legacyHeaders.map((_, i) => row.legacyValues[i] ?? '');
+        const refCells = outputCompare.refactorHeaders.map((_, i) => row.refactorValues[i] ?? '');
+        return [
+          row.status,
+          row.legacyRowKey,
+          row.refactorRowKey,
+          ...legacyCells,
+          ...refCells,
+        ];
+      });
+
+      csv = toCsv([headers, ...rows]);
+    } else {
+      csv = toCsv([
+        [
+          'Regular Dashboard ID',
+          'Refactor Dashboard ID',
+          'Widget ID',
+          'Status',
+          'Reason',
+        ],
+        [
+          result.regularDashboardId,
+          result.refactorDashboardId,
+          result.widgetId,
+          result.status,
+          result.reason ?? 'Output data unavailable for this widget.',
+        ],
+      ]);
+    }
+
+    const safeWidgetId = result.widgetId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `widget_proof_${safeWidgetId}_${Date.now()}.csv`;
+    link.click();
+  };
+
+  const inspectWidget = (result: WidgetCompareResult) => {
     setQaState((prev) => ({
       ...prev,
       inputs: {
@@ -237,16 +440,34 @@ export default function DashboardInspectorPage() {
         regToken: config.regular.token.trim(),
         refUrl: config.refactor.url.trim(),
         refToken: config.refactor.token.trim(),
-        regDashId: regularDashboardId,
-        refDashId: refactorDashboardId,
-        regWidgetId: widgetId,
-        refWidgetId: widgetId,
+        regDashId: result.regularDashboardId,
+        refDashId: result.refactorDashboardId,
+        regWidgetId: result.widgetId,
+        refWidgetId: result.widgetId,
       },
       phase: 'WIDGET_QA_RUNNING',
       createdAt: new Date().toISOString(),
     }));
 
     router.push('/widget');
+  };
+
+  const getWidgetStatus = (key: string): WidgetRunStatus => {
+    if (runningWidgets[key]) return 'RUNNING';
+    if (compareResults[key]) return compareResults[key].status;
+    return 'NOT_RUN';
+  };
+
+  const toggleDashboardExpanded = (dashboardKey: string) => {
+    setExpandedDashboards((prev) => ({ ...prev, [dashboardKey]: !prev[dashboardKey] }));
+  };
+
+  const getWidgetStatusLabel = (status: WidgetRunStatus): string => {
+    if (status === 'NOT_RUN') return 'READY';
+    if (status === 'RUNNING') return 'RUNNING';
+    if (status === 'MISMATCH') return 'MISMATCH';
+    if (status === 'ERROR') return 'ERROR';
+    return 'MATCH';
   };
 
   return (
@@ -259,8 +480,7 @@ export default function DashboardInspectorPage() {
             Dashboard Inspector
           </h1>
           <p className="text-sm text-slate-500 mt-2 max-w-3xl">
-            Fetch dashboard inventories from both environments, auto-match by Dashboard ID,
-            auto-match widgets, then click a matched widget to open Widget Inspector with inputs prefilled.
+            Fetch both dashboard inventories, compare all common widgets, run full quality assurance checks, and export proof data to CSV.
           </p>
         </section>
 
@@ -303,119 +523,243 @@ export default function DashboardInspectorPage() {
           })}
         </section>
 
-        <section className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm">
+        <section className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm space-y-4">
           <button
-            onClick={runDashboardInspect}
-            disabled={!canRun || loading}
+            onClick={fetchMatches}
+            disabled={!canFetchMatches || loadingMatches}
             className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg ${
-              !canRun || loading
+              !canFetchMatches || loadingMatches
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                 : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 shadow-blue-200'
             }`}
           >
-            {loading ? 'Fetching and Matching Dashboards...' : 'Run Dashboard Inspect'}
+            {loadingMatches ? 'Fetching Dashboard Inventory...' : 'Fetch Dashboard Inventory'}
           </button>
 
           {error && (
-            <p className="mt-4 text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2 text-sm font-semibold">
+            <p className="text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2 text-sm font-semibold">
               {error}
             </p>
           )}
         </section>
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <SummaryCard label="Legacy Dashboards" value={summary.regularDashboards} tone="slate" />
-          <SummaryCard label="Refactor Dashboards" value={summary.refactorDashboards} tone="slate" />
-          <SummaryCard label="Matched Dashboards" value={summary.matchedDashboardCount} tone="blue" />
-          <SummaryCard label="Matched Widgets" value={summary.totalMatchedWidgets} tone="emerald" />
+        <section className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <SummaryCard label="Common Dashboards" value={summary.matchedDashboards} tone="blue" />
+          <SummaryCard label="Common Widgets" value={summary.matchedWidgets} tone="slate" />
+          <SummaryCard label="Compared" value={summary.compared} tone="slate" />
+          <SummaryCard label="Matches" value={summary.matched} tone="emerald" />
+          <SummaryCard label="Mismatches" value={summary.mismatched + summary.errors} tone="rose" />
         </section>
 
-        <section className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">
-              Matched Dashboards and Widgets
-            </h3>
-            <span className="text-xs text-slate-500">
-              Click any matched widget to inspect it in Widget Inspector.
-            </span>
+        <section className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm h-[70vh] flex flex-col">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">
+                Common Dashboards and Common Widgets
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Run compare directly on each common widget.
+              </p>
+            </div>
+            <button
+              onClick={exportComparedCsv}
+              disabled={Object.keys(compareResults).length === 0}
+              className={`px-3 py-2 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                Object.keys(compareResults).length === 0
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-slate-900 text-white hover:bg-blue-600'
+              }`}
+            >
+              <Download size={12} /> Export Compared CSV
+            </button>
           </div>
 
-          {matchedDashboards.length === 0 ? (
-            <div className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl p-5 bg-slate-50">
-              No matched dashboards yet. Run Dashboard Inspect after entering both environment credentials.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {matchedDashboards.map((dash) => (
-                <div
-                  key={`${dash.regularDashboardId}-${dash.refactorDashboardId}`}
-                  className="border border-slate-200 rounded-2xl p-4 bg-slate-50"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4 mb-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-slate-500 font-black mb-1">
-                          Legacy Dashboard
-                        </div>
-                        <div className="text-[11px] text-slate-700 font-semibold">{dash.regularTitle}</div>
-                        <code className="text-[11px] font-mono text-blue-700">{dash.regularDashboardId}</code>
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-slate-500 font-black mb-1">
-                          Refactor Dashboard
-                        </div>
-                        <div className="text-[11px] text-slate-700 font-semibold">{dash.refactorTitle}</div>
-                        <code className="text-[11px] font-mono text-blue-700">{dash.refactorDashboardId}</code>
-                      </div>
-                    </div>
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+            {matchedDashboards.length === 0 ? (
+              <div className="text-sm text-slate-500 border border-dashed border-slate-200 rounded-xl p-5 bg-slate-50">
+                No common dashboards yet. Fetch inventory after entering both environment credentials.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {matchedDashboards.map((dash) => {
+                  const dashboardKey = `${dash.regularDashboardId}-${dash.refactorDashboardId}`;
+                  const isExpanded = Boolean(expandedDashboards[dashboardKey]);
 
-                    <div className="flex items-center gap-2">
-                      {dash.matchedWidgets.length > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 size={12} /> MATCHED WIDGETS: {dash.matchedWidgets.length}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-200">
-                          <XCircle size={12} /> NO WIDGET MATCH
-                        </span>
-                      )}
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
-                        {dash.matchBasis === 'dashboard_id' ? 'MATCHED BY ID' : 'MATCHED BY TITLE'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {dash.matchedWidgets.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {dash.matchedWidgets.map((widgetId) => (
-                        <div
-                          key={`${dash.regularDashboardId}-${dash.refactorDashboardId}-${widgetId}`}
-                          className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-2"
-                        >
-                          <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                              {getWidgetDisplayTitle(widgetId)}
-                            </div>
-                            <code className="text-[11px] font-mono text-slate-700 break-all">{widgetId}</code>
+                  return (
+                    <div
+                      key={dashboardKey}
+                      className="border border-slate-200 rounded-2xl p-4 bg-white"
+                    >
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0">
+                          <div className="text-[20px] leading-tight text-blue-600 font-black mb-1 truncate">
+                            {dash.regularTitle === dash.refactorTitle
+                              ? dash.regularTitle
+                              : `${dash.regularTitle} / ${dash.refactorTitle}`}
                           </div>
-                          <button
-                            onClick={() =>
-                              inspectWidget(dash.regularDashboardId, dash.refactorDashboardId, widgetId)
-                            }
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-blue-600 transition-all shrink-0"
-                          >
-                            <Link2 size={12} /> Inspect
-                          </button>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 size={12} /> COMMON WIDGETS: {dash.matchedWidgets.length}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
+                              Match Basis: {dash.matchBasis === 'dashboard_id' ? 'ID' : 'TITLE'}
+                            </span>
+                          </div>
                         </div>
-                      ))}
+
+                        <button
+                          onClick={() => toggleDashboardExpanded(dashboardKey)}
+                          className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest bg-white border border-slate-300 text-slate-700 hover:bg-slate-50"
+                        >
+                          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          {isExpanded ? 'Collapse' : 'Expand'}
+                        </button>
+                      </div>
+
+                      {isExpanded ? (
+                        <>
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 mb-3">
+                            <div className="text-[10px] uppercase tracking-widest text-slate-400 font-black mt-1">
+                              Dashboard ID
+                            </div>
+
+                            {dash.regularDashboardId === dash.refactorDashboardId ? (
+                              <code className="text-[11px] font-mono text-slate-600 break-all">
+                                {dash.regularDashboardId}
+                              </code>
+                            ) : (
+                              <div className="mt-1 space-y-1">
+                                <div className="text-[11px] text-slate-600">
+                                  <span className="font-semibold">Regular:</span>{' '}
+                                  <code className="font-mono break-all">{dash.regularDashboardId}</code>
+                                </div>
+                                <div className="text-[11px] text-slate-600">
+                                  <span className="font-semibold">Refactor:</span>{' '}
+                                  <code className="font-mono break-all">{dash.refactorDashboardId}</code>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {dash.matchedWidgets.length > 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {dash.matchedWidgets.map((widgetId) => {
+                                const key = widgetKey(
+                                  dash.regularDashboardId,
+                                  dash.refactorDashboardId,
+                                  widgetId
+                                );
+                                const widgetTitle =
+                                  dash.regularWidgetTitles[widgetId] ??
+                                  dash.refactorWidgetTitles[widgetId];
+                                const status = getWidgetStatus(key);
+                                const result = compareResults[key];
+                                const canInspect = status === 'MISMATCH' || status === 'ERROR';
+
+                                return (
+                                  <div
+                                    key={key}
+                                    className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3"
+                                  >
+                                    <div className="min-w-0 space-y-1">
+                                      {widgetTitle ? (
+                                        <>
+                                          <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                            Widget Title
+                                          </div>
+                                          <div className="text-[12px] font-semibold text-slate-800 truncate">
+                                            {widgetTitle}
+                                          </div>
+                                        </>
+                                      ) : null}
+                                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 pt-1">
+                                        Widget ID
+                                      </div>
+                                      <code className="text-[11px] font-mono text-slate-700 break-all">{widgetId}</code>
+                                      {result?.reason ? (
+                                        <p className="text-[10px] text-rose-600 mt-1 line-clamp-2">{result.reason}</p>
+                                      ) : null}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {status !== 'NOT_RUN' ? (
+                                        <span
+                                          className={`px-2 py-1 rounded-full text-[10px] font-black border ${
+                                            status === 'MATCH'
+                                              ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                                              : status === 'MISMATCH'
+                                                ? 'bg-rose-100 text-rose-700 border-rose-200'
+                                                : status === 'ERROR'
+                                                  ? 'bg-amber-100 text-amber-700 border-amber-200'
+                                                  : 'bg-blue-100 text-blue-700 border-blue-200'
+                                          }`}
+                                        >
+                                          {getWidgetStatusLabel(status)}
+                                        </span>
+                                      ) : null}
+
+                                      <button
+                                        onClick={() =>
+                                          compareSingleWidget(
+                                            dash.regularDashboardId,
+                                            dash.refactorDashboardId,
+                                            widgetId
+                                          )
+                                        }
+                                        disabled={status === 'RUNNING'}
+                                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                                          status === 'RUNNING'
+                                            ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                                            : 'bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700'
+                                        }`}
+                                      >
+                                        {result ? 'Re-run' : 'Run Compare'}
+                                      </button>
+
+                                      {canInspect && result ? (
+                                        <button
+                                          onClick={() => inspectWidget(result)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-blue-600 transition-all"
+                                        >
+                                          <Link2 size={12} /> Inspect
+                                        </button>
+                                      ) : null}
+
+                                      {result ? (
+                                        <button
+                                          onClick={() => exportWidgetProofCsv(result)}
+                                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition-all"
+                                        >
+                                          <Download size={12} /> Output CSV
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      ) : null}
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </section>
       </main>
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 10px;
+        }
+      `}</style>
     </div>
   );
 }
@@ -427,14 +771,16 @@ function SummaryCard({
 }: {
   label: string;
   value: number;
-  tone: 'slate' | 'blue' | 'emerald';
+  tone: 'slate' | 'blue' | 'emerald' | 'rose';
 }) {
   const toneClass =
     tone === 'blue'
       ? 'text-blue-600'
       : tone === 'emerald'
         ? 'text-emerald-600'
-        : 'text-slate-700';
+        : tone === 'rose'
+          ? 'text-rose-600'
+          : 'text-slate-700';
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
