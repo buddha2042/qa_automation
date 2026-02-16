@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import DxcLogo from '@/components/DxcLogo';
 
 const PIPELINE_STEPS = [
   {
@@ -50,7 +51,7 @@ export default function QaLandingPage() {
       <nav className="w-full border-b border-slate-200 bg-white/60 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <div className="h-7 px-3 rounded bg-slate-900 text-white text-xs font-black flex items-center tracking-widest">DXC</div>
+            <DxcLogo width={82} height={22} className="h-6 w-auto" priority />
             <div className="h-4 w-px bg-slate-300 hidden sm:block"></div>
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hidden sm:block">
               Quality Assurance

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import DxcLogo from '@/components/DxcLogo';
 
 interface ComparisonItem {
   path: string;
@@ -42,7 +43,7 @@ export default function AuditResultsView({ regularData, refactorData, comparison
       <nav className="bg-white border-b border-slate-200 py-4 px-8 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-1.5 rounded text-white font-bold text-xs">DXC</div>
+            <DxcLogo width={70} height={18} className="h-5 w-auto" />
             <h1 className="text-xl font-semibold">Data Audit</h1>
           </div>
           <button onClick={() => router.push('/widget')} className="text-sm font-medium underline text-slate-500 hover:text-slate-800">
