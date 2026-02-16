@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowLeft, Layers } from 'lucide-react';
+import DxcLogo from '@/components/DxcLogo';
 
 interface AppHeaderProps {
   title: string;
@@ -39,9 +40,7 @@ export default function AppHeader({
               Back
             </Link>
           )}
-          <div className="h-6 px-2 rounded bg-slate-900 text-white text-[11px] font-black tracking-widest flex items-center">
-            DXC
-          </div>
+          <DxcLogo width={70} height={18} className="h-5 w-auto" />
           <Layers className="text-blue-600" size={18} />
           <div className="min-w-0">
             <h1 className="font-black uppercase tracking-tight text-slate-800 text-lg leading-tight truncate">
