@@ -50,8 +50,11 @@ export default function CompareResults({
 
   return (
     <>
-      <section ref={widgetPreviewRef} className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <section
+        ref={widgetPreviewRef}
+        className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm h-[70vh] flex flex-col"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 shrink-0">
           <div>
             <h2 className="text-sm font-black uppercase tracking-widest text-slate-700">Widget Preview</h2>
             <p className="text-xs text-slate-500">
@@ -76,46 +79,48 @@ export default function CompareResults({
           </p>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PreviewSideCard label="Legacy Preview" tone="rose">
-            {!regularData ? (
-              <div className="h-[280px] flex items-center justify-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
-                Fetch legacy payload first.
-              </div>
-            ) : (
-              <WidgetNaturalPreview
-                payload={regularData}
-                queryRows={previewRows.regular}
-                queryLoading={loadingPreviewRegular}
-                peerRows={previewRows.refactor}
-              />
-            )}
-          </PreviewSideCard>
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PreviewSideCard label="Legacy Preview" tone="rose">
+              {!regularData ? (
+                <div className="h-[280px] flex items-center justify-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
+                  Fetch legacy payload first.
+                </div>
+              ) : (
+                <WidgetNaturalPreview
+                  payload={regularData}
+                  queryRows={previewRows.regular}
+                  queryLoading={loadingPreviewRegular}
+                  peerRows={previewRows.refactor}
+                />
+              )}
+            </PreviewSideCard>
 
-          <PreviewSideCard label="Refactor Preview" tone="emerald">
-            {!refactorData ? (
-              <div className="h-[280px] flex items-center justify-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
-                Fetch refactor payload first.
-              </div>
-            ) : (
-              <WidgetNaturalPreview
-                payload={refactorData}
-                queryRows={previewRows.refactor}
-                queryLoading={loadingPreviewRefactor}
-                peerRows={previewRows.regular}
-              />
-            )}
-          </PreviewSideCard>
-        </div>
-
-        {(previewRows.regular.length > 0 || previewRows.refactor.length > 0) && (
-          <div className="mt-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-            Preview Diff Rows:
-            <span className={`ml-2 ${previewDiffCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-              {previewDiffCount}
-            </span>
+            <PreviewSideCard label="Refactor Preview" tone="emerald">
+              {!refactorData ? (
+                <div className="h-[280px] flex items-center justify-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
+                  Fetch refactor payload first.
+                </div>
+              ) : (
+                <WidgetNaturalPreview
+                  payload={refactorData}
+                  queryRows={previewRows.refactor}
+                  queryLoading={loadingPreviewRefactor}
+                  peerRows={previewRows.regular}
+                />
+              )}
+            </PreviewSideCard>
           </div>
-        )}
+
+          {(previewRows.regular.length > 0 || previewRows.refactor.length > 0) && (
+            <div className="mt-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">
+              Preview Diff Rows:
+              <span className={`ml-2 ${previewDiffCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {previewDiffCount}
+              </span>
+            </div>
+          )}
+        </div>
       </section>
 
       <div className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-700">

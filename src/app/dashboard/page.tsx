@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/AppHeader';
 import { useQa } from '@/context/QaContext';
 import { CheckCircle2, Link2, Download, ChevronDown, ChevronRight } from 'lucide-react';
@@ -86,6 +85,18 @@ interface WidgetCompareResult {
   };
 }
 
+interface WidgetInspectPrefill {
+  regUrl: string;
+  regToken: string;
+  refUrl: string;
+  refToken: string;
+  regDashId: string;
+  refDashId: string;
+  regWidgetId: string;
+  refWidgetId: string;
+  createdAt: string;
+}
+
 const isValidHttpUrl = (value: string) => {
   try {
     const parsed = new URL(value);
@@ -133,7 +144,6 @@ const toCsv = (rows: string[][]): string =>
     .join('\n');
 
 export default function DashboardInspectorPage() {
-  const router = useRouter();
   const { setQaState } = useQa();
 
   const [config, setConfig] = useState<ConfigState>({
@@ -433,23 +443,43 @@ export default function DashboardInspectorPage() {
   };
 
   const inspectWidget = (result: WidgetCompareResult) => {
+    const payload: WidgetInspectPrefill = {
+      regUrl: config.regular.url.trim(),
+      regToken: config.regular.token.trim(),
+      refUrl: config.refactor.url.trim(),
+      refToken: config.refactor.token.trim(),
+      regDashId: result.regularDashboardId,
+      refDashId: result.refactorDashboardId,
+      regWidgetId: result.widgetId,
+      refWidgetId: result.widgetId,
+      createdAt: new Date().toISOString(),
+    };
+
+    const prefillKey = `widget_inspect_prefill_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(prefillKey, JSON.stringify(payload));
+
     setQaState((prev) => ({
       ...prev,
       inputs: {
-        regUrl: config.regular.url.trim(),
-        regToken: config.regular.token.trim(),
-        refUrl: config.refactor.url.trim(),
-        refToken: config.refactor.token.trim(),
-        regDashId: result.regularDashboardId,
-        refDashId: result.refactorDashboardId,
-        regWidgetId: result.widgetId,
-        refWidgetId: result.widgetId,
+        regUrl: payload.regUrl,
+        regToken: payload.regToken,
+        refUrl: payload.refUrl,
+        refToken: payload.refToken,
+        regDashId: payload.regDashId,
+        refDashId: payload.refDashId,
+        regWidgetId: payload.regWidgetId,
+        refWidgetId: payload.refWidgetId,
       },
       phase: 'WIDGET_QA_RUNNING',
-      createdAt: new Date().toISOString(),
+      createdAt: payload.createdAt,
     }));
 
-    router.push('/widget');
+    const opened = window.open(`/widget?prefillKey=${encodeURIComponent(prefillKey)}`, '_blank');
+    if (opened) {
+      opened.opener = null;
+    } else {
+      setError('Popup blocked. Please allow popups for this site to open Widget Inspector in a new tab.');
+    }
   };
 
   const getWidgetStatus = (key: string): WidgetRunStatus => {
@@ -654,7 +684,7 @@ export default function DashboardInspectorPage() {
                                   dash.refactorWidgetTitles[widgetId];
                                 const status = getWidgetStatus(key);
                                 const result = compareResults[key];
-                                const canInspect = status === 'MISMATCH' || status === 'ERROR';
+                                const canInspect = Boolean(result);
 
                                 return (
                                   <div

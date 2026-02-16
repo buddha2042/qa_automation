@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQa, QaInputs } from '@/context/QaContext';
 import PayloadView from '@/components/PayloadView';
 import AppHeader from '@/components/AppHeader';
@@ -48,6 +48,8 @@ const isLeafValue = (val: unknown) =>
   typeof val !== 'object' ||
   (Array.isArray(val) && val.length === 0) ||
   (typeof val === 'object' && val !== null && Object.keys(val).length === 0);
+
+const IGNORED_COMPARE_PATHS = new Set(['style.content.html']);
 
 const isValidHttpUrl = (value: string) => {
   try {
@@ -243,6 +245,7 @@ const countPreviewDiffRows = (left: string[][], right: string[][]): number => {
 
 export default function WidgetComparePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setQaState, resetQa } = useQa();
   const widgetPreviewRef = useRef<HTMLElement>(null);
 
@@ -298,6 +301,45 @@ export default function WidgetComparePage() {
     return () => window.removeEventListener('pageshow', onPageShow);
   }, [resetWidgetPageState]);
 
+  useEffect(() => {
+    const prefillKey = searchParams.get('prefillKey');
+    if (!prefillKey) return;
+
+    const raw = localStorage.getItem(prefillKey);
+    if (!raw) {
+      router.replace('/widget');
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<QaInputs>;
+      const prefilledInputs: QaInputs = {
+        ...EMPTY_INPUTS,
+        regUrl: typeof parsed.regUrl === 'string' ? parsed.regUrl : '',
+        regToken: typeof parsed.regToken === 'string' ? parsed.regToken : '',
+        regDashId: typeof parsed.regDashId === 'string' ? parsed.regDashId : '',
+        regWidgetId: typeof parsed.regWidgetId === 'string' ? parsed.regWidgetId : '',
+        refUrl: typeof parsed.refUrl === 'string' ? parsed.refUrl : '',
+        refToken: typeof parsed.refToken === 'string' ? parsed.refToken : '',
+        refDashId: typeof parsed.refDashId === 'string' ? parsed.refDashId : '',
+        refWidgetId: typeof parsed.refWidgetId === 'string' ? parsed.refWidgetId : '',
+      };
+
+      setInputs(prefilledInputs);
+      setQaState((prev) => ({
+        ...prev,
+        inputs: prefilledInputs,
+        phase: 'WIDGET_QA_RUNNING',
+        createdAt: new Date().toISOString(),
+      }));
+    } catch {
+      // Ignore malformed prefill payload and keep page usable.
+    } finally {
+      localStorage.removeItem(prefillKey);
+      router.replace('/widget');
+    }
+  }, [searchParams, router, setQaState]);
+
   const filteredReport = useMemo(
     () => (showDiffOnly ? comparisonReport.filter((r) => !r.isMatch) : comparisonReport),
     [comparisonReport, showDiffOnly]
@@ -321,6 +363,10 @@ export default function WidgetComparePage() {
     obj2: JsonValue | undefined,
     path = ''
   ): ComparisonItem[] => {
+    if (path && IGNORED_COMPARE_PATHS.has(path)) {
+      return [];
+    }
+
     if (isLeafValue(obj1) || isLeafValue(obj2)) {
       return [
         {

@@ -112,6 +112,8 @@ interface WidgetCompareResultItem {
   reason?: string;
 }
 
+const IGNORED_COMPARE_PATHS = new Set(['widget.style.content.html']);
+
 const stableStringify = (value: unknown): string => {
   if (Array.isArray(value)) {
     return `[${value.map((item) => stableStringify(item)).join(',')}]`;
@@ -141,6 +143,10 @@ const collectFieldComparisons = (
   right: unknown,
   path: string
 ): WidgetFieldComparisonRow[] => {
+  if (path && IGNORED_COMPARE_PATHS.has(path)) {
+    return [];
+  }
+
   const leftObject = left && typeof left === 'object';
   const rightObject = right && typeof right === 'object';
 
