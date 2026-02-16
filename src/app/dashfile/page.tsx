@@ -154,7 +154,7 @@ export default function QaCapturePage() {
             {(results.regular.length > 0 || results.refactor.length > 0) && (
               <button
                 onClick={downloadAsCsv}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20"
               >
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" /></svg>
                 Export CSV
@@ -171,10 +171,10 @@ export default function QaCapturePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {(['regular', 'refactor'] as Environment[]).map((env) => (
-            <div key={env} className="flex flex-col">
-              <div className={`p-6 rounded-t-xl border-t-2 border-x border-slate-200 bg-white ${env === 'regular' ? 'border-t-green-500' : 'border-t-yellow-500'}`}>
-                <h2 className="text-lg font-bold capitalize mb-4 flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${env === 'regular' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+            <div key={env} className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden">
+              <div className="p-6 border-b border-slate-200">
+                <h2 className="text-lg font-black capitalize mb-4 flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${env === 'regular' ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
                   {env} Environment
                 </h2>
 
@@ -183,35 +183,35 @@ export default function QaCapturePage() {
                     placeholder="Base URL (e.g. https://instance.sisense.com)"
                     value={config[env].url}
                     onChange={(e) => setConfig({ ...config, [env]: { ...config[env], url: e.target.value } })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
                   />
                   <input
                     type="password"
                     placeholder="API Token (JWT)"
                     value={config[env].token}
                     onChange={(e) => setConfig({ ...config, [env]: { ...config[env], token: e.target.value } })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
                   />
                   <button
                     onClick={() => fetchInventory(env)}
                     disabled={loading[env]}
-                    className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all ${env === 'regular' ? 'bg-green-600 hover:bg-green-500 shadow-green-900/20' : 'bg-yellow-600 hover:bg-yellow-500 text-black shadow-yellow-900/20'} disabled:opacity-50 shadow-lg`}
+                    className={`w-full py-2.5 rounded-lg font-bold text-sm transition-all ${env === 'regular' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20 text-white' : 'bg-amber-500 hover:bg-amber-400 text-slate-900 shadow-amber-900/20'} disabled:opacity-50 shadow-lg`}
                   >
                     {loading[env] ? 'Processing Sisense...' : 'Fetch Dashboards & Widgets'}
                   </button>
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-b-xl p-4 h-[650px] overflow-auto custom-scrollbar">
+              <div className={`bg-white p-4 ${results[env].length > 0 ? 'h-[650px] overflow-auto custom-scrollbar' : ''}`}>
                 {results[env].length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-slate-400 italic text-sm space-y-2">
-                    <svg className="w-8 h-8 opacity-10" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
-                    <p>No inventory loaded.</p>
+                  <div className="text-slate-400 text-sm rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6">
+                    <p className="font-medium text-slate-500">No inventory loaded yet.</p>
+                    <p className="text-xs text-slate-400 mt-1">Enter credentials and click Fetch Dashboards & Widgets.</p>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     {results[env].map((dash) => (
-                      <div key={`${dash.dashboardId}-${env}`} className="bg-slate-50 rounded-xl border border-slate-200 p-4 hover:border-slate-300 transition-colors shadow-sm">
+                      <div key={`${dash.dashboardId}-${env}`} className="bg-slate-50 rounded-lg border border-slate-200 p-4 hover:border-slate-300 transition-colors shadow-sm">
                         <div className="mb-4">
                           <h3 className="text-sm font-bold text-slate-900 mb-2 line-clamp-1" title={dash.title}>
                             {dash.title}
@@ -243,7 +243,7 @@ export default function QaCapturePage() {
                             <span>Widgets ({dash.widgets.length})</span>
                           </div>
                           {dash.widgets.map((wId) => (
-                            <div key={wId} className="flex items-center justify-between text-[11px] bg-white hover:bg-slate-50 p-2 rounded-lg group transition-colors border border-slate-200">
+                            <div key={wId} className="flex items-center justify-between text-[11px] bg-white hover:bg-slate-50 p-2 rounded-md group transition-colors border border-slate-200">
                               <span className="text-slate-600 font-mono">{wId}</span>
                               <button
                                 onClick={() => navigator.clipboard.writeText(wId)}
