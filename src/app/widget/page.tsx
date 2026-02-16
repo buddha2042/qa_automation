@@ -1,63 +1,22 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQa, QaInputs } from '@/context/QaContext';
 import PayloadView from '@/components/PayloadView';
 import AppHeader from '@/components/AppHeader';
+import { XCircle, Database, Zap, FileJson } from 'lucide-react';
+import InputField from './components/InputField';
+import CompareResults from './components/CompareResults';
 import {
-  Search,
-  CheckCircle2,
-  XCircle,
-  Download,
-  Database,
-  Zap,
-  FileJson,
-  Filter,
-  Copy,
-} from 'lucide-react';
-
-type Environment = 'regular' | 'refactor';
-type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-
-interface ComparisonItem {
-  path: string;
-  regularValue: JsonValue | undefined;
-  refactorValue: JsonValue | undefined;
-  isMatch: boolean;
-}
-
-interface WidgetPayload {
-  [key: string]: JsonValue;
-}
-
-interface WidgetPanelItem {
-  jaql?: {
-    title?: string;
-    dim?: string;
-    formula?: string;
-    datatype?: string;
-    filter?: {
-      members?: string[];
-    };
-  };
-  disabled?: boolean;
-}
-
-interface WidgetPanel {
-  name?: string;
-  items?: WidgetPanelItem[];
-}
-
-interface WidgetPayloadTyped extends WidgetPayload {
-  widgetType?: JsonValue;
-  widgetSubType?: JsonValue;
-  panels?: JsonValue;
-  style?: JsonValue;
-  datasource?: {
-    fullname?: string;
-  };
-}
+  type Environment,
+  type JsonValue,
+  type ComparisonItem,
+  type WidgetPayload,
+  type WidgetPanel,
+  type WidgetPanelItem,
+  type WidgetPayloadTyped,
+} from './types';
 
 const EMPTY_INPUTS: QaInputs = {
   regUrl: '',
@@ -101,22 +60,98 @@ const isValidHttpUrl = (value: string) => {
 
 interface PreviewQueryBody {
   datasource: WidgetPayloadTyped['datasource'];
-  metadata: Array<{ jaql: WidgetPanelItem['jaql']; panel: string | undefined }>;
+  count?: number;
+  metadata: Array<{
+    jaql: WidgetPanelItem['jaql'];
+    panel: string | undefined;
+    disabled?: boolean;
+    instanceid?: string;
+    field?: {
+      id?: string;
+      index?: number;
+    };
+  }>;
 }
 
 const prepareJaqlBody = (widgetJson: WidgetPayloadTyped): PreviewQueryBody | null => {
   const panels = asPanels(widgetJson.panels);
-  if (panels.length === 0) return null;
+  const panelMetadata =
+    panels.length > 0
+      ? panels.flatMap((panel) =>
+          (panel.items ?? []).map((item) => ({
+            jaql: item.jaql,
+            panel: panel.name,
+            disabled: item.disabled,
+          }))
+        )
+      : [];
 
-  const metadata = panels.flatMap((panel) =>
-    (panel.items ?? []).map((item) => ({
-      jaql: item.jaql,
-      panel: panel.name,
-    }))
+  const rawMetadata =
+    panelMetadata.length === 0 && Array.isArray(widgetJson.metadata)
+      ? widgetJson.metadata
+          .filter((item) => item.jaql)
+          .map((item) => ({
+            jaql: item.jaql,
+            panel: item.panel,
+            disabled: item.disabled,
+            instanceid: item.instanceid,
+            field: item.field,
+          }))
+      : [];
+
+  const metadata = [...panelMetadata, ...rawMetadata].filter(
+    (item) => item.jaql && !item.disabled
   );
 
-  return { datasource: widgetJson.datasource, metadata };
+  if (metadata.length === 0) return null;
+
+  const fallbackDatasource =
+    widgetJson.datasource?.fullname ??
+    widgetJson.query?.datasource?.fullname ??
+    metadata.find((item) => item.jaql?.datasource?.fullname)?.jaql?.datasource?.fullname;
+
+  return {
+    datasource: fallbackDatasource ? { fullname: fallbackDatasource } : widgetJson.datasource,
+    count: widgetJson.query?.count ?? 1000,
+    metadata,
+  };
 };
+
+const resolveDatasourceFullname = (
+  widgetJson: WidgetPayloadTyped,
+  jaqlBody: PreviewQueryBody | null
+): string | null =>
+  widgetJson.datasource?.fullname?.trim() ||
+  widgetJson.query?.datasource?.fullname?.trim() ||
+  jaqlBody?.datasource?.fullname?.trim() ||
+  jaqlBody?.metadata.find((item) => item.jaql?.datasource?.fullname)?.jaql?.datasource?.fullname?.trim() ||
+  null;
+
+const getExpectedPreviewColumns = (payload: WidgetPayloadTyped): number => {
+  const panels = asPanels(payload.panels);
+  const fromPanels =
+    getPanelItems(panels, 'rows').length + getPanelItems(panels, 'values').length;
+  if (fromPanels > 0) return fromPanels;
+
+  if (!Array.isArray(payload.metadata)) return 0;
+  return payload.metadata.filter(
+    (item) => !item.disabled && (item.panel === 'rows' || item.panel === 'values')
+  ).length;
+};
+
+const getEnvConfig = (inputs: QaInputs, env: Environment) =>
+  env === 'regular'
+    ? {
+        url: inputs.regUrl.trim(),
+        token: inputs.regToken.trim(),
+      }
+    : {
+        url: inputs.refUrl.trim(),
+        token: inputs.refToken.trim(),
+      };
+
+const hasQueryMetadata = (payload: WidgetPayloadTyped): boolean =>
+  Array.isArray(payload.query?.metadata) && payload.query.metadata.length > 0;
 
 const normalizePreviewRows = (values: unknown, expectedColumns: number): string[][] => {
   if (!Array.isArray(values)) return [];
@@ -206,24 +241,10 @@ const countPreviewDiffRows = (left: string[][], right: string[][]): number => {
   return unmatched;
 };
 
-const getRowMismatchFlags = (rows: string[][], peerRows: string[][]): boolean[] => {
-  const peerMap = buildRowCountMap(peerRows);
-
-  return rows.map((row) => {
-    const key = rowKey(row);
-    const count = peerMap.get(key) ?? 0;
-    if (count > 0) {
-      peerMap.set(key, count - 1);
-      return false;
-    }
-    return true;
-  });
-};
-
 export default function WidgetComparePage() {
   const router = useRouter();
   const { setQaState, resetQa } = useQa();
-  const resultsRef = useRef<HTMLDivElement>(null);
+  const widgetPreviewRef = useRef<HTMLElement>(null);
 
   const [inputs, setInputs] = useState<QaInputs>(EMPTY_INPUTS);
 
@@ -245,6 +266,8 @@ export default function WidgetComparePage() {
   const [error, setError] = useState('');
   const [showDiffOnly, setShowDiffOnly] = useState(false);
   const [hasCompared, setHasCompared] = useState(false);
+  const isComparisonRunning =
+    loading.compare || loading.previewRegular || loading.previewRefactor;
 
   const resetWidgetPageState = useCallback(() => {
     setInputs(EMPTY_INPUTS);
@@ -353,62 +376,12 @@ export default function WidgetComparePage() {
       const json = (await res.json()) as { error?: string; data?: WidgetPayload };
       if (!res.ok || !json.data) throw new Error(json.error || 'Fetch failed');
 
-      const typedPayload = json.data as WidgetPayloadTyped;
-      const jaqlBody = prepareJaqlBody(typedPayload);
-      const expectedColumns =
-        getPanelItems(asPanels(typedPayload.panels), 'rows').length +
-        getPanelItems(asPanels(typedPayload.panels), 'values').length;
-
       if (isReg) {
         setRegularData(json.data);
+        setPreviewRows((prev) => ({ ...prev, regular: [] }));
       } else {
         setRefactorData(json.data);
-      }
-
-      setLoading((prev) => ({
-        ...prev,
-        [isReg ? 'previewRegular' : 'previewRefactor']: true,
-      }));
-
-      if (jaqlBody && typedPayload.datasource?.fullname) {
-        try {
-          const previewRes = await fetch('/api/widget/jaql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              baseUrl: config.url.trim(),
-              token: config.token.trim(),
-              datasource: typedPayload.datasource.fullname,
-              jaql: jaqlBody,
-            }),
-          });
-
-          const previewJson = (await previewRes.json()) as {
-            data?: { values?: unknown };
-            error?: string;
-          };
-
-          if (previewRes.ok && previewJson.data) {
-            const normalized = normalizePreviewRows(
-              previewJson.data.values,
-              expectedColumns > 0 ? expectedColumns : 1
-            );
-            setPreviewRows((prev) => ({ ...prev, [env]: normalized }));
-          } else {
-            setPreviewRows((prev) => ({ ...prev, [env]: [] }));
-          }
-        } finally {
-          setLoading((prev) => ({
-            ...prev,
-            [isReg ? 'previewRegular' : 'previewRefactor']: false,
-          }));
-        }
-      } else {
-        setPreviewRows((prev) => ({ ...prev, [env]: [] }));
-        setLoading((prev) => ({
-          ...prev,
-          [isReg ? 'previewRegular' : 'previewRefactor']: false,
-        }));
+        setPreviewRows((prev) => ({ ...prev, refactor: [] }));
       }
 
       setHasCompared(false);
@@ -420,26 +393,126 @@ export default function WidgetComparePage() {
     }
   };
 
-  const runComparison = () => {
+  const fetchPreviewForEnv = async (env: Environment, payload: WidgetPayloadTyped) => {
+    const loadingKey = env === 'regular' ? 'previewRegular' : 'previewRefactor';
+    const config = getEnvConfig(inputs, env);
+    const jaqlBody = prepareJaqlBody(payload);
+    const expectedColumns = getExpectedPreviewColumns(payload);
+    const datasourceFullname = resolveDatasourceFullname(payload, jaqlBody);
+
+    setLoading((prev) => ({ ...prev, [loadingKey]: true }));
+
+    try {
+      if (!isValidHttpUrl(config.url) || !config.token) {
+        setPreviewRows((prev) => ({ ...prev, [env]: [] }));
+        setError(`${env} preview query skipped: missing API URL or token.`);
+        return;
+      }
+
+      if (hasQueryMetadata(payload)) {
+        const fullDataRes = await fetch('/api/widget/fetch-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: config.url,
+            token: config.token,
+            widgetPayload: payload,
+          }),
+        });
+
+        const fullDataJson = (await fullDataRes.json()) as {
+          data?: unknown;
+          error?: string;
+          rowCount?: number;
+        };
+
+        if (fullDataRes.ok && Array.isArray(fullDataJson.data)) {
+          const normalized = normalizePreviewRows(
+            fullDataJson.data,
+            expectedColumns > 0 ? expectedColumns : 1
+          );
+          setPreviewRows((prev) => ({ ...prev, [env]: normalized }));
+          return;
+        }
+
+        setPreviewRows((prev) => ({ ...prev, [env]: [] }));
+        setError(
+          `${env} preview (full query) failed: ${
+            fullDataJson.error ?? 'no data returned from widget query endpoint'
+          }`
+        );
+        return;
+      }
+
+      if (!jaqlBody || !datasourceFullname) {
+        setPreviewRows((prev) => ({ ...prev, [env]: [] }));
+        setError(`${env} preview query skipped: datasource/metadata missing in payload.`);
+        return;
+      }
+
+      const previewRes = await fetch('/api/widget/jaql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: config.url,
+          token: config.token,
+          datasource: datasourceFullname,
+          jaql: {
+            ...jaqlBody,
+            count: jaqlBody.count ?? 1000,
+          },
+        }),
+      });
+
+      const previewJson = (await previewRes.json()) as {
+        data?: { values?: unknown };
+        error?: string;
+      };
+
+      if (previewRes.ok && previewJson.data) {
+        const normalized = normalizePreviewRows(
+          previewJson.data.values,
+          expectedColumns > 0 ? expectedColumns : 1
+        );
+        setPreviewRows((prev) => ({ ...prev, [env]: normalized }));
+      } else {
+        setPreviewRows((prev) => ({ ...prev, [env]: [] }));
+        setError(`${env} preview query failed: ${previewJson.error ?? 'unknown error'}`);
+      }
+    } finally {
+      setLoading((prev) => ({ ...prev, [loadingKey]: false }));
+    }
+  };
+
+  const runComparison = async () => {
     if (!regularData || !refactorData) return;
     setLoading((prev) => ({ ...prev, compare: true }));
+    setError('');
 
-    const report = getFullComparison(regularData, refactorData);
-    setComparisonReport(report);
-    setHasCompared(true);
-    setLoading((prev) => ({ ...prev, compare: false }));
+    try {
+      const report = getFullComparison(regularData, refactorData);
+      setComparisonReport(report);
+      setHasCompared(true);
 
-    setQaState((prev) => ({
-      ...prev,
-      inputs,
-      regularData,
-      refactorData,
-      comparisonReport: report,
-      phase: 'DATA_AUDIT_PENDING',
-      createdAt: new Date().toISOString(),
-    }));
+      setQaState((prev) => ({
+        ...prev,
+        inputs,
+        regularData,
+        refactorData,
+        comparisonReport: report,
+        phase: 'DATA_AUDIT_PENDING',
+        createdAt: new Date().toISOString(),
+      }));
 
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      setTimeout(() => widgetPreviewRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+
+      await Promise.all([
+        fetchPreviewForEnv('regular', regularData as WidgetPayloadTyped),
+        fetchPreviewForEnv('refactor', refactorData as WidgetPayloadTyped),
+      ]);
+    } finally {
+      setLoading((prev) => ({ ...prev, compare: false }));
+    }
   };
 
   const handleExportCSV = () => {
@@ -590,74 +663,6 @@ export default function WidgetComparePage() {
           })}
         </div>
 
-        <section className="bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-sm font-black uppercase tracking-widest text-slate-700">Widget Preview</h2>
-              <p className="text-xs text-slate-500">
-                Native pivot preview generated from payload + live JAQL rows.
-              </p>
-            </div>
-            <button
-              onClick={handleExportPreviewCompareCsv}
-              disabled={!canExportPreviewCsv}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                canExportPreviewCsv
-                  ? 'bg-slate-900 text-white hover:bg-blue-600'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              }`}
-            >
-              Export Side-by-Side CSV
-            </button>
-          </div>
-          {!canExportPreviewCsv && (
-            <p className="text-[11px] text-slate-400 mb-3">
-              Export will be enabled after both Legacy and Refactor preview rows are loaded.
-            </p>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PreviewSideCard label="Legacy Preview" tone="rose">
-              {!regularData ? (
-                <div className="h-[280px] flex items-center justify-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
-                  Fetch legacy payload to generate preview.
-                </div>
-              ) : (
-                <WidgetNaturalPreview
-                  payload={regularData as WidgetPayloadTyped}
-                  queryRows={previewRows.regular}
-                  queryLoading={loading.previewRegular}
-                  peerRows={previewRows.refactor}
-                />
-              )}
-            </PreviewSideCard>
-
-            <PreviewSideCard label="Refactor Preview" tone="emerald">
-              {!refactorData ? (
-                <div className="h-[280px] flex items-center justify-center text-sm text-slate-400 bg-white border border-slate-200 rounded-2xl">
-                  Fetch refactor payload to generate preview.
-                </div>
-              ) : (
-                <WidgetNaturalPreview
-                  payload={refactorData as WidgetPayloadTyped}
-                  queryRows={previewRows.refactor}
-                  queryLoading={loading.previewRefactor}
-                  peerRows={previewRows.regular}
-                />
-              )}
-            </PreviewSideCard>
-          </div>
-
-          {(previewRows.regular.length > 0 || previewRows.refactor.length > 0) && (
-            <div className="mt-4 text-[11px] font-bold uppercase tracking-widest text-slate-500">
-              Preview Diff Rows:
-              <span className={`ml-2 ${previewDiffCount > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                {previewDiffCount}
-              </span>
-            </div>
-          )}
-        </section>
-
         {(regularData || refactorData) && (
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {([
@@ -685,6 +690,11 @@ export default function WidgetComparePage() {
             <Zap className={loading.compare ? 'animate-pulse' : ''} fill="currentColor" />
             {loading.compare ? 'ANALYZING PAYLOADS...' : 'RUN FULL AUDIT COMPARISON'}
           </button>
+          {isComparisonRunning && (
+            <p className="mt-3 text-xs font-semibold text-slate-500">
+              Running comparison and loading widget preview rows...
+            </p>
+          )}
           {error && (
             <p className="mt-4 text-rose-600 font-bold bg-rose-50 px-4 py-2 rounded-xl border border-rose-100 flex items-center gap-2">
               <XCircle size={16} /> {error}
@@ -692,95 +702,23 @@ export default function WidgetComparePage() {
           )}
         </div>
 
-        {hasCompared && (
-          <div ref={resultsRef} className="space-y-10 animate-in fade-in slide-in-from-bottom-10 duration-700">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <StatCard label="Total Audit Points" val={comparisonReport.length} icon={<Search className="text-slate-300" />} />
-              <StatCard
-                label="Mismatches"
-                val={comparisonReport.filter((r) => !r.isMatch).length}
-                color="text-rose-600"
-                icon={<XCircle className="text-rose-400" />}
-              />
-              <StatCard
-                label="Matches"
-                val={comparisonReport.filter((r) => r.isMatch).length}
-                color="text-emerald-600"
-                icon={<CheckCircle2 className="text-emerald-400" />}
-              />
-              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 flex flex-col justify-center items-center gap-2">
-                <p className="text-[10px] font-black uppercase text-slate-400">View Filter</p>
-                <button
-                  onClick={() => setShowDiffOnly(!showDiffOnly)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${showDiffOnly ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700'}`}
-                >
-                  <Filter size={14} /> {showDiffOnly ? 'Diff Only' : 'Show All'}
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-[2.5rem] shadow-xl overflow-hidden">
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-20">
-                <h3 className="font-black text-2xl italic text-slate-800">Audit Logs</h3>
-                <button
-                  onClick={handleExportCSV}
-                  className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-lg shadow-slate-200"
-                >
-                  <Download size={14} /> Export CSV
-                </button>
-              </div>
-
-              <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
-                <table className="w-full text-left border-collapse">
-                  <thead className="sticky top-0 bg-slate-50 z-10">
-                    <tr className="border-b">
-                      <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Status</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Object Path</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Legacy Value</th>
-                      <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Refactor Value</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredReport.map((r, i) => (
-                      <tr key={i} className={`group hover:bg-slate-50 transition-colors ${!r.isMatch ? 'bg-rose-50/20' : ''}`}>
-                        <td className="p-6">
-                          <span
-                            className={`inline-flex items-center gap-1 text-[9px] font-black px-2.5 py-1 rounded-full border ${
-                              r.isMatch
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
-                                : 'bg-rose-100 text-rose-700 border-rose-200'
-                            }`}
-                          >
-                            {r.isMatch ? 'MATCH' : 'DIFF'}
-                          </span>
-                        </td>
-                        <td className="p-6">
-                          <div className="flex items-center gap-2">
-                            <code className="text-[11px] font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
-                              {r.path}
-                            </code>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(r.path)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-blue-500"
-                            >
-                              <Copy size={12} />
-                            </button>
-                          </div>
-                        </td>
-                        <td className="p-6 text-[11px] font-mono text-slate-500 max-w-[380px] whitespace-pre-wrap break-all align-top">
-                          {JSON.stringify(r.regularValue, null, 2)}
-                        </td>
-                        <td className={`p-6 text-[11px] font-mono max-w-[380px] whitespace-pre-wrap break-all align-top ${!r.isMatch ? 'text-rose-600 font-black' : 'text-slate-500'}`}>
-                          {JSON.stringify(r.refactorValue, null, 2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
+        <CompareResults
+          hasCompared={hasCompared}
+          widgetPreviewRef={widgetPreviewRef}
+          canExportPreviewCsv={canExportPreviewCsv}
+          onExportPreviewCompareCsv={handleExportPreviewCompareCsv}
+          previewRows={previewRows}
+          previewDiffCount={previewDiffCount}
+          regularData={(regularData as WidgetPayloadTyped | null) ?? null}
+          refactorData={(refactorData as WidgetPayloadTyped | null) ?? null}
+          loadingPreviewRegular={loading.previewRegular}
+          loadingPreviewRefactor={loading.previewRefactor}
+          comparisonReport={comparisonReport}
+          filteredReport={filteredReport}
+          showDiffOnly={showDiffOnly}
+          onToggleDiffOnly={() => setShowDiffOnly(!showDiffOnly)}
+          onExportCSV={handleExportCSV}
+        />
       </main>
 
       <style jsx global>{`
@@ -793,43 +731,6 @@ export default function WidgetComparePage() {
           border-radius: 10px;
         }
       `}</style>
-    </div>
-  );
-}
-
-interface InputFieldProps {
-  placeholder: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-}
-
-function InputField({ onChange, ...props }: InputFieldProps) {
-  return (
-    <input
-      {...props}
-      autoComplete="off"
-      onChange={(e) => onChange(e.target.value)}
-      className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-    />
-  );
-}
-
-interface StatCardProps {
-  label: string;
-  val: number;
-  icon: ReactNode;
-  color?: string;
-}
-
-function StatCard({ label, val, icon, color = 'text-slate-800' }: StatCardProps) {
-  return (
-    <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center justify-between transition-transform hover:scale-[1.02]">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">{label}</p>
-        <p className={`text-4xl font-black ${color}`}>{val}</p>
-      </div>
-      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-inner">{icon}</div>
     </div>
   );
 }
@@ -848,164 +749,4 @@ function jaqlLabel(item: WidgetPanelItem): string {
   const jaql = item.jaql;
   if (!jaql) return 'Unnamed';
   return jaql.title || jaql.dim || jaql.formula || 'Unnamed';
-}
-
-function WidgetNaturalPreview({
-  payload,
-  queryRows,
-  queryLoading,
-  peerRows,
-}: {
-  payload: WidgetPayloadTyped;
-  queryRows: string[][];
-  queryLoading: boolean;
-  peerRows: string[][];
-}) {
-  const widgetType = typeof payload.widgetType === 'string' ? payload.widgetType : 'unknown';
-  const widgetSubType = typeof payload.widgetSubType === 'string' ? payload.widgetSubType : 'unknown';
-  const panels = asPanels(payload.panels);
-
-  const rows = getPanelItems(panels, 'rows');
-  const values = getPanelItems(panels, 'values');
-  const filters = getPanelItems(panels, 'filters');
-
-  if (widgetType.includes('pivot')) {
-    return (
-      <PivotWidgetPreview
-        widgetType={widgetType}
-        widgetSubType={widgetSubType}
-        rows={rows}
-        values={values}
-        filters={filters}
-        queryRows={queryRows}
-        queryLoading={queryLoading}
-        peerRows={peerRows}
-      />
-    );
-  }
-
-  return (
-    <div className="p-4 bg-white">
-      <div className="text-xs text-slate-500 mb-3">
-        Widget type <span className="font-bold text-slate-700">{widgetType}</span> is not yet mapped to a native renderer.
-      </div>
-      <div className="text-[11px] text-slate-600">
-        Using metadata summary for now. You can still compare payload values and audit output data below.
-      </div>
-    </div>
-  );
-}
-
-function PivotWidgetPreview({
-  widgetType,
-  widgetSubType,
-  rows,
-  values,
-  filters,
-  queryRows,
-  queryLoading,
-  peerRows,
-}: {
-  widgetType: string;
-  widgetSubType: string;
-  rows: WidgetPanelItem[];
-  values: WidgetPanelItem[];
-  filters: WidgetPanelItem[];
-  queryRows: string[][];
-  queryLoading: boolean;
-  peerRows: string[][];
-}) {
-  const headers = [...rows.map(jaqlLabel), ...values.map(jaqlLabel)];
-  const allMembers = filters.flatMap((item) => item.jaql?.filter?.members ?? []);
-
-  const fallbackRows = allMembers.map((member) => {
-    const rowCells = rows.map((_, idx) => (idx === 0 ? member : 'Closed'));
-    const valueCells = values.map(() => '');
-    return [...rowCells, ...valueCells];
-  });
-  const tableRows = queryRows.length > 0 ? queryRows : fallbackRows;
-  const rowMismatchFlags = getRowMismatchFlags(tableRows, peerRows);
-
-  return (
-    <div className="p-1 bg-white">
-      <div className="rounded-md border border-slate-300 overflow-auto">
-        <table className="w-full text-[13px]">
-          <thead className="bg-slate-100 border-b border-slate-300">
-            <tr>
-              {headers.length === 0 ? (
-                <th className="text-left p-2 font-semibold text-slate-600">No mapped rows/values found</th>
-              ) : (
-                headers.map((head) => (
-                  <th key={head} className="text-left p-2 font-semibold text-slate-600 whitespace-nowrap border-r border-slate-300 last:border-r-0">
-                    {head}
-                  </th>
-                ))
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {queryLoading && headers.length > 0 && (
-              <tr>
-                <td colSpan={headers.length} className="p-3 text-slate-400 text-[12px] italic">
-                  Loading live query rows...
-                </td>
-              </tr>
-            )}
-            {!queryLoading && headers.length > 0 && tableRows.length > 0 && tableRows.map((cells, rowIdx) => (
-              <tr key={rowIdx} className="border-b border-slate-300 last:border-b-0">
-                {cells.map((cell, colIdx) => (
-                  <td
-                    key={`${rowIdx}-${colIdx}`}
-                    className={`p-2 border-r border-slate-300 last:border-r-0 ${
-                      rowMismatchFlags[rowIdx]
-                        ? 'text-rose-700 bg-rose-50/60 font-semibold'
-                        : 'text-slate-700'
-                    }`}
-                  >
-                    {cell || ''}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {!queryLoading && headers.length > 0 && tableRows.length === 0 && (
-              <tr>
-                <td colSpan={headers.length} className="p-3 text-slate-400 text-[12px] italic">
-                  No rows returned from preview query for this widget.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-2 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-        {widgetType} / {widgetSubType}
-      </div>
-    </div>
-  );
-}
-
-function PreviewSideCard({
-  label,
-  tone,
-  children,
-}: {
-  label: string;
-  tone: 'rose' | 'emerald';
-  children: ReactNode;
-}) {
-  const chipClass =
-    tone === 'rose'
-      ? 'text-rose-700 border-rose-200 bg-rose-50'
-      : 'text-emerald-700 border-emerald-200 bg-emerald-50';
-
-  return (
-    <div className="border border-slate-200 rounded-2xl p-4 bg-white">
-      <div className="mb-3">
-        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded border ${chipClass}`}>
-          {label}
-        </span>
-      </div>
-      {children}
-    </div>
-  );
 }

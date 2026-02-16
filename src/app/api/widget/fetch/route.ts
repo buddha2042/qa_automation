@@ -18,6 +18,8 @@ interface SisenseWidget {
     datasource?: {
       fullname?: string;
     };
+    metadata?: Array<{ jaql?: unknown }>;
+    count?: number;
   };
   metadata?: {
     panels?: WidgetPanel[];
@@ -57,6 +59,13 @@ function extractComparableWidget(widget: SisenseWidget) {
     widgetSubType: widget.subtype ?? null,
     datasource: {
       fullname: query.datasource?.fullname ?? widget.datasource?.fullname ?? null,
+    },
+    query: {
+      datasource: {
+        fullname: query.datasource?.fullname ?? widget.datasource?.fullname ?? null,
+      },
+      metadata: query.metadata ?? [],
+      count: query.count ?? 1000,
     },
     panels: panels.map((p) => ({
       name: p.name,

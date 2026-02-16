@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { isJaqlQueryShape, toSqlLikeQuery } from '@/lib/utils/jaqlSql';
+import { isPanelsShape, toPanelsPrettyText } from '@/lib/utils/panelsFormat';
 
 type JsonLike = null | boolean | number | string | JsonLike[] | { [key: string]: JsonLike };
 
@@ -94,7 +96,19 @@ export default function PayloadView({ data, emptyText = 'No payload available', 
               {Object.entries(data as Record<string, unknown>).map(([key, value]) => (
                 <tr key={key} className="border-b last:border-b-0">
                   <td className="p-3 align-top text-slate-600 font-bold">{key}</td>
-                  <td className="p-3 align-top text-slate-700 font-mono">{toDisplay(value)}</td>
+                  <td className="p-3 align-top text-slate-700 font-mono">
+                    {key === 'query' && isJaqlQueryShape(value) ? (
+                      <pre className="whitespace-pre-wrap break-words text-[11px] leading-5">
+                        {toSqlLikeQuery(value)}
+                      </pre>
+                    ) : key === 'panels' && isPanelsShape(value) ? (
+                      <pre className="whitespace-pre-wrap break-words text-[11px] leading-5">
+                        {toPanelsPrettyText(value)}
+                      </pre>
+                    ) : (
+                      toDisplay(value)
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
