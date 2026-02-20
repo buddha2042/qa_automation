@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import AppHeader from '@/components/AppHeader';
+import {
+  BASE_URL_PRESET_OPTIONS,
+  getPresetFromUrl,
+  getUrlForPreset,
+  type BaseUrlPreset,
+  SISENSE_BASE_URLS,
+} from '@/lib/sisenseEnvironments';
 
 type Environment = 'regular' | 'refactor';
 
@@ -41,8 +48,12 @@ const isValidHttpUrl = (value: string) => {
 
 export default function QaCapturePage() {
   const [config, setConfig] = useState<ConfigState>({
-    regular: { url: '', token: '' },
-    refactor: { url: '', token: '' },
+    regular: { url: SISENSE_BASE_URLS.regular, token: '' },
+    refactor: { url: SISENSE_BASE_URLS.refactor, token: '' },
+  });
+  const [urlPresets, setUrlPresets] = useState<Record<Environment, BaseUrlPreset>>({
+    regular: 'regular',
+    refactor: 'refactor',
   });
 
   const [results, setResults] = useState<Record<Environment, DashboardResult[]>>({
@@ -141,6 +152,19 @@ export default function QaCapturePage() {
     }
   };
 
+  const handlePresetChange = (env: Environment, preset: BaseUrlPreset) => {
+    setUrlPresets((prev) => ({ ...prev, [env]: preset }));
+    setConfig((prev) => ({
+      ...prev,
+      [env]: { ...prev[env], url: getUrlForPreset(preset, prev[env].url) },
+    }));
+  };
+
+  const handleUrlChange = (env: Environment, value: string) => {
+    setConfig((prev) => ({ ...prev, [env]: { ...prev[env], url: value } }));
+    setUrlPresets((prev) => ({ ...prev, [env]: getPresetFromUrl(value) }));
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <AppHeader title="DXC Quality Lab" subtitle="Master Informer" backHref="/" />
@@ -179,10 +203,22 @@ export default function QaCapturePage() {
                 </h2>
 
                 <div className="space-y-4">
+                  <select
+                    value={urlPresets[env]}
+                    onChange={(e) => handlePresetChange(env, e.target.value as BaseUrlPreset)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
+                  >
+                    {BASE_URL_PRESET_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                   <input
-                    placeholder="Base URL (e.g. https://instance.sisense.com)"
+                    placeholder="Manual Base URL"
                     value={config[env].url}
-                    onChange={(e) => setConfig({ ...config, [env]: { ...config[env], url: e.target.value } })}
+                    onChange={(e) => handleUrlChange(env, e.target.value)}
+                    disabled={urlPresets[env] !== 'manual'}
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
                   />
                   <input

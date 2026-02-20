@@ -3,6 +3,7 @@ interface InputFieldProps {
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  disabled?: boolean;
 }
 
 export default function InputField({ onChange, ...props }: InputFieldProps) {

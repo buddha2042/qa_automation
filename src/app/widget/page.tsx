@@ -5,9 +5,17 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQa, QaInputs } from '@/context/QaContext';
 import PayloadView from '@/components/PayloadView';
 import AppHeader from '@/components/AppHeader';
-import { XCircle, Database, Zap, FileJson } from 'lucide-react';
+import { XCircle, Zap, FileJson } from 'lucide-react';
 import InputField from './components/InputField';
 import CompareResults from './components/CompareResults';
+import {
+  BASE_URL_PRESET_OPTIONS,
+  getPresetFromUrl,
+  getUrlForPreset,
+  type BaseUrlPreset,
+  type Environment as UrlEnvironment,
+  SISENSE_BASE_URLS,
+} from '@/lib/sisenseEnvironments';
 import {
   type Environment,
   type JsonValue,
@@ -19,11 +27,11 @@ import {
 } from './types';
 
 const EMPTY_INPUTS: QaInputs = {
-  regUrl: '',
+  regUrl: SISENSE_BASE_URLS.regular,
   regToken: '',
   regDashId: '',
   regWidgetId: '',
-  refUrl: '',
+  refUrl: SISENSE_BASE_URLS.refactor,
   refToken: '',
   refDashId: '',
   refWidgetId: '',
@@ -250,6 +258,10 @@ export default function WidgetComparePage() {
   const widgetPreviewRef = useRef<HTMLElement>(null);
 
   const [inputs, setInputs] = useState<QaInputs>(EMPTY_INPUTS);
+  const [urlPresets, setUrlPresets] = useState<Record<UrlEnvironment, BaseUrlPreset>>({
+    regular: 'regular',
+    refactor: 'refactor',
+  });
 
   const [regularData, setRegularData] = useState<WidgetPayload | null>(null);
   const [refactorData, setRefactorData] = useState<WidgetPayload | null>(null);
@@ -274,6 +286,7 @@ export default function WidgetComparePage() {
 
   const resetWidgetPageState = useCallback(() => {
     setInputs(EMPTY_INPUTS);
+    setUrlPresets({ regular: 'regular', refactor: 'refactor' });
     setRegularData(null);
     setRefactorData(null);
     setComparisonReport([]);
@@ -326,6 +339,10 @@ export default function WidgetComparePage() {
       };
 
       setInputs(prefilledInputs);
+      setUrlPresets({
+        regular: getPresetFromUrl(prefilledInputs.regUrl),
+        refactor: getPresetFromUrl(prefilledInputs.refUrl),
+      });
       setQaState((prev) => ({
         ...prev,
         inputs: prefilledInputs,
@@ -390,6 +407,21 @@ export default function WidgetComparePage() {
 
   const handleInputChange = (field: keyof QaInputs, value: string) => {
     setInputs((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUrlPresetChange = (env: UrlEnvironment, preset: BaseUrlPreset) => {
+    setUrlPresets((prev) => ({ ...prev, [env]: preset }));
+    const field: keyof QaInputs = env === 'regular' ? 'regUrl' : 'refUrl';
+    setInputs((prev) => ({
+      ...prev,
+      [field]: getUrlForPreset(preset, prev[field]),
+    }));
+  };
+
+  const handleUrlInputChange = (env: UrlEnvironment, value: string) => {
+    const field: keyof QaInputs = env === 'regular' ? 'regUrl' : 'refUrl';
+    setInputs((prev) => ({ ...prev, [field]: value }));
+    setUrlPresets((prev) => ({ ...prev, [env]: getPresetFromUrl(value) }));
   };
 
   const handleFetch = async (env: Environment) => {
@@ -668,14 +700,23 @@ export default function WidgetComparePage() {
             return (
               <div key={env} className="space-y-6">
                 <section className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm">
-                  <h2 className={`text-xs font-black uppercase mb-6 flex items-center gap-2 ${isReg ? 'text-rose-500' : 'text-emerald-500'}`}>
-                    <Database size={14} /> {isReg ? 'Source: Legacy (Old)' : 'Target: Refactor (New)'}
-                  </h2>
                   <div className="space-y-3">
+                    <select
+                      value={urlPresets[env]}
+                      onChange={(e) => handleUrlPresetChange(env, e.target.value as BaseUrlPreset)}
+                      className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    >
+                      {BASE_URL_PRESET_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                     <InputField
-                      placeholder="API Base URL"
+                      placeholder="Manual API Base URL"
                       value={inputs[`${prefix}Url` as keyof QaInputs]}
-                      onChange={(v) => handleInputChange(`${prefix}Url` as keyof QaInputs, v)}
+                      onChange={(v) => handleUrlInputChange(env, v)}
+                      disabled={urlPresets[env] !== 'manual'}
                     />
                     <InputField
                       placeholder="Bearer Token"

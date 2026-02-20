@@ -4,6 +4,13 @@ import { useMemo, useState } from 'react';
 import AppHeader from '@/components/AppHeader';
 import { useQa } from '@/context/QaContext';
 import { CheckCircle2, Link2, Download, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  BASE_URL_PRESET_OPTIONS,
+  getPresetFromUrl,
+  getUrlForPreset,
+  type BaseUrlPreset,
+  SISENSE_BASE_URLS,
+} from '@/lib/sisenseEnvironments';
 
 type Environment = 'regular' | 'refactor';
 type MatchBasis = 'dashboard_id' | 'dashboard_title';
@@ -147,8 +154,12 @@ export default function DashboardInspectorPage() {
   const { setQaState } = useQa();
 
   const [config, setConfig] = useState<ConfigState>({
-    regular: { url: '', token: '' },
-    refactor: { url: '', token: '' },
+    regular: { url: SISENSE_BASE_URLS.regular, token: '' },
+    refactor: { url: SISENSE_BASE_URLS.refactor, token: '' },
+  });
+  const [urlPresets, setUrlPresets] = useState<Record<Environment, BaseUrlPreset>>({
+    regular: 'regular',
+    refactor: 'refactor',
   });
 
   const [inventories, setInventories] = useState<Record<Environment, DashboardItem[]>>({
@@ -492,6 +503,22 @@ export default function DashboardInspectorPage() {
     setExpandedDashboards((prev) => ({ ...prev, [dashboardKey]: !prev[dashboardKey] }));
   };
 
+  const handlePresetChange = (env: Environment, preset: BaseUrlPreset) => {
+    setUrlPresets((prev) => ({ ...prev, [env]: preset }));
+    setConfig((prev) => ({
+      ...prev,
+      [env]: { ...prev[env], url: getUrlForPreset(preset, prev[env].url) },
+    }));
+  };
+
+  const handleUrlChange = (env: Environment, value: string) => {
+    setConfig((prev) => ({
+      ...prev,
+      [env]: { ...prev[env], url: value },
+    }));
+    setUrlPresets((prev) => ({ ...prev, [env]: getPresetFromUrl(value) }));
+  };
+
   const getWidgetStatusLabel = (status: WidgetRunStatus): string => {
     if (status === 'NOT_RUN') return 'READY';
     if (status === 'RUNNING') return 'RUNNING';
@@ -516,23 +543,25 @@ export default function DashboardInspectorPage() {
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {(['regular', 'refactor'] as const).map((env) => {
-            const isRegular = env === 'regular';
-
             return (
               <div key={env} className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm space-y-4">
-                <h2 className={`text-xs font-black uppercase tracking-widest ${isRegular ? 'text-rose-500' : 'text-emerald-500'}`}>
-                  {isRegular ? 'Source: Legacy (Old)' : 'Target: Refactor (New)'}
-                </h2>
+                <select
+                  value={urlPresets[env]}
+                  onChange={(e) => handlePresetChange(env, e.target.value as BaseUrlPreset)}
+                  className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                >
+                  {BASE_URL_PRESET_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
 
                 <input
-                  placeholder="API Base URL"
+                  placeholder="Manual API Base URL"
                   value={config[env].url}
-                  onChange={(e) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      [env]: { ...prev[env], url: e.target.value },
-                    }))
-                  }
+                  onChange={(e) => handleUrlChange(env, e.target.value)}
+                  disabled={urlPresets[env] !== 'manual'}
                   className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
 
