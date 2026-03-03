@@ -84,7 +84,7 @@ export default function QaLandingPage() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-20">
           <ActionCard
             title="Master"
             highlight="Informer"
@@ -116,6 +116,17 @@ export default function QaLandingPage() {
             btnColor="bg-blue-600 shadow-blue-200 hover:bg-blue-700"
             hoverBorder="hover:border-blue-500 hover:shadow-blue-100"
             onClick={() => router.push('/widget')}
+          />
+
+          <ActionCard
+            title="Excel"
+            highlight="Audit"
+            highlightColor="text-sky-600"
+            desc="Upload SAP BI and Sisense exports, map mismatched layouts, and compare row-level output."
+            btnText="Compare Sheets"
+            btnColor="bg-sky-600 shadow-sky-200 hover:bg-sky-700"
+            hoverBorder="hover:border-sky-500 hover:shadow-sky-100"
+            onClick={() => router.push('/excel-audit')}
           />
         </div>
 
