@@ -44,7 +44,8 @@ export interface DashboardCompareCredentials {
 export interface CompareSingleWidgetInput {
   regularDashboardId: string;
   refactorDashboardId: string;
-  widgetId: string;
+  regularWidgetId: string;
+  refactorWidgetId: string;
 }
 
 type WidgetCompareStatus = 'MATCH' | 'MISMATCH' | 'ERROR';
@@ -106,7 +107,8 @@ export interface CompareSingleWidgetResult extends WidgetCompareResultItem {
 }
 
 interface WidgetCompareResultItem {
-  widgetId: string;
+  regularWidgetId: string;
+  refactorWidgetId: string;
   status: WidgetCompareStatus;
   diffCount: number;
   reason?: string;
@@ -545,13 +547,13 @@ export async function compareSingleWidget(
         regularBase,
         credentials.regular.token,
         input.regularDashboardId,
-        input.widgetId
+        input.regularWidgetId
       ),
       fetchComparableWidget(
         refactorBase,
         credentials.refactor.token,
         input.refactorDashboardId,
-        input.widgetId
+        input.refactorWidgetId
       ),
     ]);
 
@@ -578,7 +580,8 @@ export async function compareSingleWidget(
 
     const diffCount = structuralDiffCount;
     return {
-      widgetId: input.widgetId,
+      regularWidgetId: input.regularWidgetId,
+      refactorWidgetId: input.refactorWidgetId,
       status: diffCount === 0 ? 'MATCH' : 'MISMATCH',
       diffCount,
       comparisons,
@@ -587,7 +590,8 @@ export async function compareSingleWidget(
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'Unknown widget compare error';
     return {
-      widgetId: input.widgetId,
+      regularWidgetId: input.regularWidgetId,
+      refactorWidgetId: input.refactorWidgetId,
       status: 'ERROR',
       diffCount: 0,
       reason,

@@ -152,10 +152,20 @@ export default function DataAuditPage() {
     const isRegular = env === 'regular';
     const widgetJson = isRegular ? regularWidget : refactorWidget;
     const config = isRegular
-      ? { url: inputs.regUrl, token: inputs.regToken, label: 'LEGACY (OLD)' }
-      : { url: inputs.refUrl, token: inputs.refToken, label: 'REFACTOR (NEW)' };
+      ? {
+          url: inputs.regUrl,
+          username: inputs.regUsername,
+          password: inputs.regPassword,
+          label: 'LEGACY (OLD)',
+        }
+      : {
+          url: inputs.refUrl,
+          username: inputs.refUsername,
+          password: inputs.refPassword,
+          label: 'REFACTOR (NEW)',
+        };
 
-    if (!widgetJson || !config.url || !config.token) {
+    if (!widgetJson || !config.url || !config.username || !config.password) {
       setError(`Credentials for ${config.label} are missing. Go back to Step 1.`);
       return;
     }
@@ -174,7 +184,8 @@ export default function DataAuditPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           baseUrl: config.url,
-          token: config.token,
+          username: config.username,
+          password: config.password,
           datasource: widgetJson.datasource?.fullname,
           jaql: jaqlBody,
         }),
