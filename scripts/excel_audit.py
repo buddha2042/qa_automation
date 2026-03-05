@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 import posixpath
+import re
 import sys
 import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from xml.etree import ElementTree as ET
 
@@ -20,9 +23,108 @@ NS = {
     "pkgrel": "http://schemas.openxmlformats.org/package/2006/relationships",
 }
 
+NUMERIC_PATTERN = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)$")
+NULL_TOKENS = {
+    "",
+    "-",
+    "na",
+    "n/a",
+    "null",
+    "none",
+    "nil",
+    '""',
+    "''",
+    "/",
+    "\\",
+}
+VOWELS = set("aeiou")
+
 
 def normalize_header(value: str) -> str:
     return " ".join(value.strip().lower().split())
+
+
+def try_parse_decimal(value: str) -> Decimal | None:
+    cleaned = value.strip().replace(",", "")
+    if not cleaned or not NUMERIC_PATTERN.fullmatch(cleaned):
+        return None
+    try:
+        return Decimal(cleaned)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def decimal_to_text(value: Decimal) -> str:
+    if value == value.to_integral():
+        return str(int(value))
+    text = format(value.normalize(), "f")
+    return text.rstrip("0").rstrip(".")
+
+
+def is_excel_serial_day_match(left_value: str, right_value: str) -> bool:
+    left_decimal = try_parse_decimal(left_value)
+    right_decimal = try_parse_decimal(right_value)
+    if left_decimal is None or right_decimal is None:
+        return False
+
+    left_day = int(left_decimal)
+    right_day = int(right_decimal)
+    if left_day != right_day or left_day < 20000:
+        return False
+
+    return left_decimal != left_decimal.to_integral() or right_decimal != right_decimal.to_integral()
+
+
+def is_null_like(text: str) -> bool:
+    token = text.strip().casefold()
+    if token in NULL_TOKENS:
+        return True
+    without_quotes = token.replace('"', "").replace("'", "").strip()
+    if without_quotes == "":
+        return True
+    return token.replace(".", "") in {"na", "n/a", "null", "none"}
+
+
+def normalize_numeric_text(text: str) -> str | None:
+    parsed_decimal = try_parse_decimal(text)
+    if parsed_decimal is None:
+        return None
+    if parsed_decimal != parsed_decimal.to_integral() and int(parsed_decimal) >= 20000:
+        return str(int(parsed_decimal))
+    return decimal_to_text(parsed_decimal)
+
+
+def name_mask_signature(text: str) -> str | None:
+    tokens = re.findall(r"[a-z]+", text.casefold())
+    if len(tokens) != 2:
+        return None
+    masked_tokens = [
+        "".join("x" if char in VOWELS else char for char in token)
+        for token in tokens
+    ]
+    masked_tokens.sort()
+    return " ".join(masked_tokens)
+
+
+def are_cells_equivalent(
+    left_value: Any,
+    right_value: Any,
+    trim_whitespace: bool,
+    ignore_case: bool,
+) -> bool:
+    left_text = normalize_cell(left_value, trim_whitespace, ignore_case)
+    right_text = normalize_cell(right_value, trim_whitespace, ignore_case)
+    if left_text == right_text:
+        return True
+    if is_excel_serial_day_match(left_text, right_text):
+        return True
+
+    left_name = name_mask_signature(left_text)
+    right_name = name_mask_signature(right_text)
+    if left_name and right_name and left_name == right_name:
+        return True
+
+    return False
 
 
 def normalize_cell(value: Any, trim_whitespace: bool, ignore_case: bool) -> str:
@@ -33,6 +135,14 @@ def normalize_cell(value: Any, trim_whitespace: bool, ignore_case: bool) -> str:
         text = text.strip("\n\r")
     if ignore_case:
         text = text.casefold()
+    if is_null_like(text):
+        return "__null__"
+    numeric_text = normalize_numeric_text(text)
+    if numeric_text is not None:
+        return numeric_text
+    masked_name = name_mask_signature(text)
+    if masked_name is not None:
+        return f"__name__:{masked_name}"
     return text
 
 
@@ -325,11 +435,20 @@ def row_match_score(
 ) -> int:
     score = 0
     for mapping in mappings:
-        left_value = normalize_cell(left_row["values"].get(mapping["left"], ""), trim_whitespace, ignore_case)
-        right_value = normalize_cell(right_row["values"].get(mapping["right"], ""), trim_whitespace, ignore_case)
-        if left_value == right_value:
+        if are_cells_equivalent(
+            left_row["values"].get(mapping["left"], ""),
+            right_row["values"].get(mapping["right"], ""),
+            trim_whitespace,
+            ignore_case,
+        ):
             score += 1
     return score
+
+
+def mismatch_similarity_threshold(column_count: int) -> int:
+    if column_count <= 1:
+        return 1
+    return max(1, int(math.ceil(column_count * 0.35)))
 
 
 def filter_rows(rows: list[dict[str, Any]], mappings: list[dict[str, str]], side: str, ignore_empty_rows: bool) -> list[dict[str, Any]]:
@@ -488,7 +607,7 @@ def compare_tables(payload: dict[str, Any]) -> dict[str, Any]:
         if remaining_left and remaining_right:
             used_right_indexes: set[int] = set()
             repaired_left_indexes: set[int] = set()
-            minimum_similarity = max(1, len(compare_mappings) - 1)
+            minimum_similarity = mismatch_similarity_threshold(len(compare_mappings))
 
             for left_index, left_row in enumerate(remaining_left):
                 best_index = -1
@@ -506,10 +625,14 @@ def compare_tables(payload: dict[str, Any]) -> dict[str, Any]:
                     right_row = remaining_right[best_index]
                     used_right_indexes.add(best_index)
                     repaired_left_indexes.add(left_index)
-                    mismatched += 1
+                    status = "MATCH" if best_score == len(compare_mappings) else "MISMATCH"
+                    if status == "MATCH":
+                        matched += 1
+                    else:
+                        mismatched += 1
                     comparison_rows.append(
                         {
-                            "status": "MISMATCH",
+                            "status": status,
                             "groupKey": list(group_key),
                             "leftRowNumber": left_row["_rowNumber"],
                             "rightRowNumber": right_row["_rowNumber"],

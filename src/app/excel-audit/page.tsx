@@ -28,6 +28,7 @@ interface SisenseWidgetResponse {
 }
 
 const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+const UI_NULL_TOKENS = new Set(['', '-', 'na', 'n/a', 'null', 'none', 'nil', '""', "''", '/', '\\']);
 
 const createMapping = (left = '', right = ''): ColumnMapping => ({ left, right });
 
@@ -48,6 +49,45 @@ const isValidHttpUrl = (value: string) => {
   } catch {
     return false;
   }
+};
+
+const normalizeCellForUi = (value: string) => {
+  const text = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+  if (UI_NULL_TOKENS.has(text)) return '__null__';
+  const withoutQuotes = text.replace(/["']/g, '').trim();
+  if (!withoutQuotes) return '__null__';
+  const numeric = Number(text.replace(/,/g, ''));
+  if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
+    if (!Number.isInteger(numeric) && Math.trunc(numeric) >= 20000) {
+      return String(Math.trunc(numeric));
+    }
+    return String(Number.isInteger(numeric) ? Math.trunc(numeric) : Number(numeric.toFixed(10)));
+  }
+  const nameMask = nameMaskSignatureForUi(text);
+  if (nameMask) return `__name__:${nameMask}`;
+  return text;
+};
+
+const nameMaskSignatureForUi = (value: string) => {
+  const tokens = value.toLowerCase().match(/[a-z]+/g);
+  if (!tokens || tokens.length !== 2) return null;
+  const masked = tokens
+    .map((token) => token.replace(/[aeiou]/g, 'x'))
+    .sort();
+  return masked.join(' ');
+};
+
+const isEquivalentCellForUi = (left: string, right: string) => {
+  const normalizedLeft = normalizeCellForUi(left);
+  const normalizedRight = normalizeCellForUi(right);
+  if (normalizedLeft === normalizedRight) return true;
+
+  const leftNameMask = nameMaskSignatureForUi(normalizedLeft);
+  const rightNameMask = nameMaskSignatureForUi(normalizedRight);
+  return Boolean(leftNameMask && rightNameMask && leftNameMask === rightNameMask);
 };
 
 const EXCEL_AUDIT_SISENSE_STORAGE_KEY = 'excel-audit-sisense-config';
@@ -758,7 +798,7 @@ export default function ExcelAuditPage() {
                         {compareResult.matchedHeaders.map((mapping) => {
                           const leftValue = row.leftValues[mapping.left] ?? '';
                           const rightValue = row.rightValues[mapping.right] ?? '';
-                          const isCellMatch = leftValue === rightValue;
+                          const isCellMatch = isEquivalentCellForUi(leftValue, rightValue);
 
                           return (
                             <td
