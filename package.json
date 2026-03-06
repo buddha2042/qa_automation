@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "setup": "npm install && npm run setup:python",
+    "setup:python": "bash scripts/setup_python.sh",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

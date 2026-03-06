@@ -94,7 +94,7 @@ const isEquivalentCellForUi = (left: string, right: string) => {
 const EXCEL_AUDIT_SISENSE_STORAGE_KEY = 'excel-audit-sisense-config';
 
 export default function ExcelAuditPage() {
-  const [activeTab, setActiveTab] = useState<'excel' | 'admin-inspector'>('excel');
+  const [activeTab, setActiveTab] = useState<'excel' | 'smodel' | 'admin-inspector'>('excel');
   const [leftFile, setLeftFile] = useState<File | null>(null);
   const [rightFile, setRightFile] = useState<File | null>(null);
   const [rightSourceMode, setRightSourceMode] = useState<'upload' | 'sisense'>('upload');
@@ -117,6 +117,11 @@ export default function ExcelAuditPage() {
   const [widgetLoading, setWidgetLoading] = useState(false);
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
   const [compareFilter, setCompareFilter] = useState<'mismatch' | 'match' | 'all'>('mismatch');
+  const [smodelLeftFile, setSmodelLeftFile] = useState<File | null>(null);
+  const [smodelRightFile, setSmodelRightFile] = useState<File | null>(null);
+  const [smodelCompareLoading, setSmodelCompareLoading] = useState(false);
+  const [smodelError, setSmodelError] = useState('');
+  const [smodelSuccess, setSmodelSuccess] = useState('');
   const [expandedTables, setExpandedTables] = useState({
     left: false,
     right: false,
@@ -141,6 +146,7 @@ export default function ExcelAuditPage() {
     compareResult?.comparisonRows.filter((row) =>
       compareFilter === 'all' ? true : compareFilter === 'match' ? row.status === 'MATCH' : row.status !== 'MATCH'
     ) ?? [];
+  const canRunSmodelCompare = Boolean(smodelLeftFile && smodelRightFile);
 
   const exportComparisonCsv = () => {
     if (!compareResult) return;
@@ -418,6 +424,67 @@ export default function ExcelAuditPage() {
     }
   };
 
+  const parseFilenameFromContentDisposition = (headerValue: string | null) => {
+    if (!headerValue) return '';
+    const filenameStarMatch = headerValue.match(/filename\*=UTF-8''([^;]+)/i);
+    if (filenameStarMatch?.[1]) {
+      try {
+        return decodeURIComponent(filenameStarMatch[1]);
+      } catch {
+        return filenameStarMatch[1];
+      }
+    }
+
+    const filenameMatch = headerValue.match(/filename=\"?([^\";]+)\"?/i);
+    return filenameMatch?.[1] ?? '';
+  };
+
+  const handleSmodelCompare = async () => {
+    if (!smodelLeftFile || !smodelRightFile) return;
+
+    setSmodelCompareLoading(true);
+    setSmodelError('');
+    setSmodelSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('left', smodelLeftFile);
+      formData.append('right', smodelRightFile);
+
+      const response = await fetch('/api/excel/sisense/smodel-compare', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to compare .smodel files.';
+        try {
+          const json = (await response.json()) as { error?: string };
+          if (json.error) errorMessage = json.error;
+        } catch {
+          // Keep default message when response body is not JSON.
+        }
+        throw new Error(errorMessage);
+      }
+
+      const disposition = response.headers.get('Content-Disposition');
+      const suggestedFilename = parseFilenameFromContentDisposition(disposition) || `smodel_comparison_${Date.now()}.xlsx`;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = suggestedFilename;
+      link.click();
+      URL.revokeObjectURL(url);
+      setSmodelSuccess(`Workbook generated: ${suggestedFilename}`);
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : 'Failed to compare .smodel files.';
+      setSmodelError(message);
+    } finally {
+      setSmodelCompareLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] text-slate-900">
       <AppHeader
@@ -435,6 +502,13 @@ export default function ExcelAuditPage() {
               className={`rounded-xl px-4 py-2 ${activeTab === 'excel' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
             >
               Excel Compare
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('smodel')}
+              className={`rounded-xl px-4 py-2 ${activeTab === 'smodel' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+            >
+              Smodel Compare
             </button>
             <button
               type="button"
@@ -867,6 +941,67 @@ export default function ExcelAuditPage() {
               </section>
             ) : null}
           </>
+        ) : activeTab === 'smodel' ? (
+          <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-600">Sisense Model Audit</p>
+                <h2 className="mt-2 text-3xl font-black tracking-tight">Smodel comparison export</h2>
+                <p className="mt-2 max-w-3xl text-sm text-slate-500">
+                  Upload two Sisense `.smodel` files and download a workbook with metadata, joins, table queries, hidden fields, and datatype differences.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-blue-50 p-3 text-blue-600">
+                <Database size={28} />
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-5 lg:grid-cols-2">
+              <FilePicker
+                label="Model A"
+                title="Baseline Smodel"
+                helpText="Upload the first Sisense model export file."
+                tone="blue"
+                file={smodelLeftFile}
+                onChange={setSmodelLeftFile}
+                accept=".smodel,.json"
+              />
+              <FilePicker
+                label="Model B"
+                title="Target Smodel"
+                helpText="Upload the second Sisense model export file."
+                tone="sky"
+                file={smodelRightFile}
+                onChange={setSmodelRightFile}
+                accept=".smodel,.json"
+              />
+            </div>
+
+            <div className="mt-6 flex justify-center">
+              <button
+                type="button"
+                onClick={handleSmodelCompare}
+                disabled={!canRunSmodelCompare || smodelCompareLoading}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ArrowDownUp size={16} />
+                {smodelCompareLoading ? 'Building Workbook...' : 'Compare and Download Workbook'}
+              </button>
+            </div>
+
+            {smodelError ? (
+              <div className="mt-4 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                <p>{smodelError}</p>
+              </div>
+            ) : null}
+
+            {smodelSuccess ? (
+              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                {smodelSuccess}
+              </div>
+            ) : null}
+          </section>
         ) : (
           <SisenseUserDashboardInventory
             initialBaseUrl={masterInspectorConfig.baseUrl}
@@ -885,6 +1020,7 @@ function FilePicker({
   tone,
   file,
   onChange,
+  accept,
 }: {
   label: string;
   title: string;
@@ -892,6 +1028,7 @@ function FilePicker({
   tone: 'blue' | 'sky';
   file: File | null;
   onChange: (file: File | null) => void;
+  accept?: string;
 }) {
   const toneClasses =
     tone === 'sky'
@@ -905,7 +1042,7 @@ function FilePicker({
       <p className="mt-2 text-sm text-slate-500">{helpText}</p>
       <input
         type="file"
-        accept=".xlsx,.csv"
+        accept={accept ?? '.xlsx,.csv'}
         className="mt-4 block w-full text-sm text-slate-600 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-bold file:text-white"
         onChange={(event) => onChange(event.target.files?.[0] ?? null)}
       />
