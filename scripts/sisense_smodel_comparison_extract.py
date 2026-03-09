@@ -21,11 +21,28 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, List
 
 import pandas as pd
+
+
+def df_records(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """Convert dataframe rows to JSON-safe records (NaN/NA -> None)."""
+    records: List[Dict[str, Any]] = []
+    for raw in df.to_dict(orient="records"):
+        clean: Dict[str, Any] = {}
+        for key, value in raw.items():
+            if value is None:
+                clean[key] = None
+            elif isinstance(value, float) and math.isnan(value):
+                clean[key] = None
+            else:
+                clean[key] = value
+        records.append(clean)
+    return records
 
 
 # -----------------------------
@@ -731,6 +748,7 @@ def main() -> None:
     ap.add_argument("model_a", type=Path, help="Path to first .smodel file")
     ap.add_argument("model_b", type=Path, help="Path to second .smodel file")
     ap.add_argument("--out", type=Path, default=Path("combined_smodel_metadata_summary_v2.xlsx"), help="Output .xlsx path")
+    ap.add_argument("--json-out", type=Path, default=None, help="Optional JSON output with all sheet data")
     args = ap.parse_args()
 
     model_a_label = args.model_a.name
@@ -800,6 +818,26 @@ def main() -> None:
         custom_tables.to_excel(writer, sheet_name="CUSTOM_TABLES", index=False)
         hidden_columns.to_excel(writer, sheet_name="HIDDEN_COLUMNS", index=False)
         datatypes.to_excel(writer, sheet_name="DATATYPES", index=False)
+
+    if args.json_out:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "model_a_label": model_a_label,
+            "model_b_label": model_b_label,
+            "model_a_name": model_a_name,
+            "model_b_name": model_b_name,
+            "sheets": {
+                "METADATA": df_records(metadata_all),
+                "JOINS_METADATA": df_records(joins_all),
+                "COLUMN_SUMMARY": df_records(column_summary),
+                "JOIN_SUMMARY": df_records(join_summary),
+                "TABLE_QUERIES": df_records(table_queries),
+                "CUSTOM_TABLES": df_records(custom_tables),
+                "HIDDEN_COLUMNS": df_records(hidden_columns),
+                "DATATYPES": df_records(datatypes),
+            },
+        }
+        args.json_out.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
     print(f"Output workbook: {args.out}")
     print(f"METADATA rows: {len(metadata_all):,}")

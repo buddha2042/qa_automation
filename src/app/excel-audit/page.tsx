@@ -28,6 +28,82 @@ interface SisenseWidgetResponse {
   workbookData: WorkbookData;
 }
 
+interface PythonSmodelMetadataRow {
+  source_file?: string | null;
+  database?: string | null;
+  dataset_name?: string | null;
+  schemaName?: string | null;
+  dataset_id?: string | null;
+  table_id?: string | null;
+  table_name?: string | null;
+  table_type?: string | null;
+  table_expression?: string | null;
+  column_id?: string | null;
+  column_name?: string | null;
+  hidden?: string | null;
+  displayName?: string | null;
+  description?: string | null;
+  dataType?: string | null;
+  expression?: string | null;
+  dataset_importQuery?: string | null;
+  table_importQuery?: string | null;
+}
+
+interface SmodelColumnRow {
+  key: string;
+  datasetId: string;
+  datasetName: string;
+  schemaName: string;
+  tableId: string;
+  tableName: string;
+  tableType: string;
+  tableExpression: string;
+  columnId: string;
+  columnName: string;
+  displayName: string;
+  description: string;
+  dataType: string;
+  hidden: string;
+  expression: string;
+  datasetImportQuery: string;
+  tableImportQuery: string;
+  tableQuery: string;
+}
+
+interface SmodelCompareRow {
+  key: string;
+  datasetId: string;
+  datasetName: string;
+  schemaName: string;
+  tableId: string;
+  tableName: string;
+  tableType: string;
+  leftTableType: string;
+  rightTableType: string;
+  leftTableExpression: string;
+  rightTableExpression: string;
+  columnId: string;
+  columnName: string;
+  leftDisplayName: string;
+  rightDisplayName: string;
+  leftDescription: string;
+  rightDescription: string;
+  leftDataType: string;
+  rightDataType: string;
+  leftHidden: string;
+  rightHidden: string;
+  leftExpression: string;
+  rightExpression: string;
+  leftDatasetImportQuery: string;
+  rightDatasetImportQuery: string;
+  leftTableImportQuery: string;
+  rightTableImportQuery: string;
+  leftTableQuery: string;
+  rightTableQuery: string;
+  mismatchFields: string[];
+  status: 'MATCH' | 'MISMATCH';
+}
+
 const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 const UI_NULL_TOKENS = new Set(['', '-', 'na', 'n/a', 'null', 'none', 'nil', '""', "''", '/', '\\']);
 
@@ -93,6 +169,139 @@ const isEquivalentCellForUi = (left: string, right: string) => {
 
 const EXCEL_AUDIT_SISENSE_STORAGE_KEY = 'excel-audit-sisense-config';
 
+const toSmodelText = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '';
+  }
+};
+
+const buildSmodelCompareRows = (leftRows: SmodelColumnRow[], rightRows: SmodelColumnRow[]): SmodelCompareRow[] => {
+  const leftMap = new Map(leftRows.map((row) => [row.key, row]));
+  const rightMap = new Map(rightRows.map((row) => [row.key, row]));
+  const allKeys = Array.from(new Set([...leftMap.keys(), ...rightMap.keys()])).sort();
+
+  return allKeys.map((key) => {
+    const left = leftMap.get(key);
+    const right = rightMap.get(key);
+    const leftTableType = left?.tableType ?? '';
+    const rightTableType = right?.tableType ?? '';
+    const leftTableExpression = left?.tableExpression ?? '';
+    const rightTableExpression = right?.tableExpression ?? '';
+    const leftDisplayName = left?.displayName ?? '';
+    const rightDisplayName = right?.displayName ?? '';
+    const leftDescription = left?.description ?? '';
+    const rightDescription = right?.description ?? '';
+    const leftDataType = left?.dataType ?? '';
+    const rightDataType = right?.dataType ?? '';
+    const leftHidden = left?.hidden ?? '';
+    const rightHidden = right?.hidden ?? '';
+    const leftExpression = left?.expression ?? '';
+    const rightExpression = right?.expression ?? '';
+    const leftDatasetImportQuery = left?.datasetImportQuery ?? '';
+    const rightDatasetImportQuery = right?.datasetImportQuery ?? '';
+    const leftTableImportQuery = left?.tableImportQuery ?? '';
+    const rightTableImportQuery = right?.tableImportQuery ?? '';
+    const leftTableQuery = left?.tableQuery ?? '';
+    const rightTableQuery = right?.tableQuery ?? '';
+    const mismatchFields: string[] = [];
+    if (leftTableType !== rightTableType) mismatchFields.push('table_type');
+    if (leftTableExpression !== rightTableExpression) mismatchFields.push('table_expression');
+    if (leftDisplayName !== rightDisplayName) mismatchFields.push('displayName');
+    if (leftDescription !== rightDescription) mismatchFields.push('description');
+    if (leftDataType !== rightDataType) mismatchFields.push('dataType');
+    if (leftHidden !== rightHidden) mismatchFields.push('hidden');
+    if (leftExpression !== rightExpression) mismatchFields.push('expression');
+    if (leftDatasetImportQuery !== rightDatasetImportQuery) mismatchFields.push('dataset_importQuery');
+    if (leftTableImportQuery !== rightTableImportQuery) mismatchFields.push('table_importQuery');
+    if (leftTableQuery !== rightTableQuery) mismatchFields.push('table_query');
+    const status: 'MATCH' | 'MISMATCH' = mismatchFields.length === 0 ? 'MATCH' : 'MISMATCH';
+
+    return {
+      key,
+      datasetId: left?.datasetId || right?.datasetId || '',
+      datasetName: left?.datasetName || right?.datasetName || '',
+      schemaName: left?.schemaName || right?.schemaName || '',
+      tableId: left?.tableId || right?.tableId || '',
+      tableName: left?.tableName || right?.tableName || '',
+      tableType: leftTableType || rightTableType,
+      leftTableType,
+      rightTableType,
+      leftTableExpression,
+      rightTableExpression,
+      columnId: left?.columnId || right?.columnId || '',
+      columnName: left?.columnName || right?.columnName || '',
+      leftDisplayName,
+      rightDisplayName,
+      leftDescription,
+      rightDescription,
+      leftDataType,
+      rightDataType,
+      leftHidden,
+      rightHidden,
+      leftExpression,
+      rightExpression,
+      leftDatasetImportQuery,
+      rightDatasetImportQuery,
+      leftTableImportQuery,
+      rightTableImportQuery,
+      leftTableQuery,
+      rightTableQuery,
+      mismatchFields,
+      status,
+    };
+  });
+};
+
+const buildSmodelRowsFromPythonMetadata = (
+  metadataRows: PythonSmodelMetadataRow[],
+  leftLabel: string,
+  rightLabel: string
+): SmodelCompareRow[] => {
+  const normalize = (value: unknown) => toSmodelText(value);
+  const toComparable = (row: PythonSmodelMetadataRow): SmodelColumnRow => {
+    const database = normalize(row.database);
+    const datasetId = normalize(row.dataset_id);
+    const schemaName = normalize(row.schemaName);
+    const tableId = normalize(row.table_id);
+    const columnId = normalize(row.column_id);
+    const tableExpression = normalize(row.table_expression);
+    const tableImportQuery = normalize(row.table_importQuery);
+    return {
+      key: `${database}|${datasetId}|${schemaName}|${tableId}|${columnId}`,
+      datasetId,
+      datasetName: normalize(row.dataset_name),
+      schemaName,
+      tableId,
+      tableName: normalize(row.table_name),
+      tableType: normalize(row.table_type),
+      tableExpression,
+      columnId,
+      columnName: normalize(row.column_name),
+      displayName: normalize(row.displayName),
+      description: normalize(row.description),
+      dataType: normalize(row.dataType),
+      hidden: normalize(row.hidden),
+      expression: normalize(row.expression),
+      datasetImportQuery: normalize(row.dataset_importQuery),
+      tableImportQuery,
+      tableQuery: tableExpression || tableImportQuery,
+    };
+  };
+
+  const leftRows = metadataRows
+    .filter((row) => normalize(row.source_file) === leftLabel)
+    .map(toComparable);
+  const rightRows = metadataRows
+    .filter((row) => normalize(row.source_file) === rightLabel)
+    .map(toComparable);
+  return buildSmodelCompareRows(leftRows, rightRows);
+};
+
 export default function ExcelAuditPage() {
   const [activeTab, setActiveTab] = useState<'excel' | 'smodel' | 'admin-inspector'>('excel');
   const [leftFile, setLeftFile] = useState<File | null>(null);
@@ -116,12 +325,14 @@ export default function ExcelAuditPage() {
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [widgetLoading, setWidgetLoading] = useState(false);
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
-  const [compareFilter, setCompareFilter] = useState<'mismatch' | 'match' | 'all'>('mismatch');
+  const [compareFilter, setCompareFilter] = useState<'mismatch' | 'match' | 'all'>('all');
   const [smodelLeftFile, setSmodelLeftFile] = useState<File | null>(null);
   const [smodelRightFile, setSmodelRightFile] = useState<File | null>(null);
   const [smodelCompareLoading, setSmodelCompareLoading] = useState(false);
   const [smodelError, setSmodelError] = useState('');
   const [smodelSuccess, setSmodelSuccess] = useState('');
+  const [smodelRows, setSmodelRows] = useState<SmodelCompareRow[]>([]);
+  const [smodelFilter, setSmodelFilter] = useState<'mismatch' | 'match' | 'all'>('all');
   const [expandedTables, setExpandedTables] = useState({
     left: false,
     right: false,
@@ -147,6 +358,10 @@ export default function ExcelAuditPage() {
       compareFilter === 'all' ? true : compareFilter === 'match' ? row.status === 'MATCH' : row.status !== 'MATCH'
     ) ?? [];
   const canRunSmodelCompare = Boolean(smodelLeftFile && smodelRightFile);
+  const visibleSmodelRows = smodelRows.filter((row) =>
+    smodelFilter === 'all' ? true : smodelFilter === 'match' ? row.status === 'MATCH' : row.status !== 'MATCH'
+  );
+  const smodelMismatchCount = smodelRows.filter((row) => row.status === 'MISMATCH').length;
 
   const exportComparisonCsv = () => {
     if (!compareResult) return;
@@ -328,7 +543,7 @@ export default function ExcelAuditPage() {
       }
 
       setCompareResult(json);
-      setCompareFilter('mismatch');
+      setCompareFilter('all');
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : 'Failed to compare files.';
       setError(message);
@@ -447,6 +662,31 @@ export default function ExcelAuditPage() {
     setSmodelSuccess('');
 
     try {
+      const dataForm = new FormData();
+      dataForm.append('left', smodelLeftFile);
+      dataForm.append('right', smodelRightFile);
+      const dataResponse = await fetch('/api/excel/sisense/smodel-compare-data', {
+        method: 'POST',
+        body: dataForm,
+      });
+      const dataJson = (await dataResponse.json()) as {
+        error?: string;
+        model_a_label?: string;
+        model_b_label?: string;
+        sheets?: {
+          METADATA?: PythonSmodelMetadataRow[];
+        };
+      };
+      if (!dataResponse.ok) {
+        throw new Error(dataJson.error || 'Failed to load Python comparison sheet data.');
+      }
+
+      const metadataRows = Array.isArray(dataJson.sheets?.METADATA) ? dataJson.sheets.METADATA : [];
+      const leftLabel = dataJson.model_a_label || smodelLeftFile.name;
+      const rightLabel = dataJson.model_b_label || smodelRightFile.name;
+      setSmodelRows(buildSmodelRowsFromPythonMetadata(metadataRows, leftLabel, rightLabel));
+      setSmodelFilter('all');
+
       const formData = new FormData();
       formData.append('left', smodelLeftFile);
       formData.append('right', smodelRightFile);
@@ -814,12 +1054,12 @@ export default function ExcelAuditPage() {
                     <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-bold">
                       <button
                         type="button"
-                        onClick={() => setCompareFilter('mismatch')}
+                        onClick={() => setCompareFilter('all')}
                         className={`rounded-xl px-3 py-2 ${
-                          compareFilter === 'mismatch' ? 'bg-slate-900 text-white' : 'text-slate-600'
+                          compareFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600'
                         }`}
                       >
-                        Mismatches Only
+                        All Rows
                       </button>
                       <button
                         type="button"
@@ -832,12 +1072,12 @@ export default function ExcelAuditPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setCompareFilter('all')}
+                        onClick={() => setCompareFilter('mismatch')}
                         className={`rounded-xl px-3 py-2 ${
-                          compareFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600'
+                          compareFilter === 'mismatch' ? 'bg-slate-900 text-white' : 'text-slate-600'
                         }`}
                       >
-                        All Rows
+                        Mismatches Only
                       </button>
                     </div>
                     <button
@@ -999,6 +1239,139 @@ export default function ExcelAuditPage() {
             {smodelSuccess ? (
               <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                 {smodelSuccess}
+              </div>
+            ) : null}
+
+            {smodelRows.length ? (
+              <div className="mt-6 overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-6 py-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-600">Smodel Side-By-Side</p>
+                      <h3 className="mt-1 text-xl font-black tracking-tight">Model A vs Model B table comparison</h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Compared by Dataset + Schema + Table ID + Column ID. Mirrors metadata extraction logic from the Python script.
+                      </p>
+                    </div>
+                    <div className="grid gap-2 text-xs font-bold">
+                      <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">Rows: {smodelRows.length}</span>
+                      <span className="rounded-full bg-rose-100 px-3 py-1.5 text-rose-700">Mismatches: {smodelMismatchCount}</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setSmodelFilter('all')}
+                      className={`rounded-xl px-3 py-2 ${smodelFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                    >
+                      All Rows
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSmodelFilter('match')}
+                      className={`rounded-xl px-3 py-2 ${smodelFilter === 'match' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                    >
+                      Match Only
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSmodelFilter('mismatch')}
+                      className={`rounded-xl px-3 py-2 ${smodelFilter === 'mismatch' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                    >
+                      Mismatches Only
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-[70vh] overflow-auto">
+                  <table className="min-w-full border-collapse text-left text-xs">
+                    <thead className="sticky top-0 z-10 bg-slate-950 text-white">
+                      <tr>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Status</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Mismatch Fields</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Dataset ID</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Dataset</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Schema</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Table ID</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Table</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Table Type</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Table Type</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Table Expression</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Table Expression</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Column ID</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Column</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Display Name</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Display Name</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Description</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Description</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Datatype</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Datatype</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Hidden</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Hidden</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Expression</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Expression</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Dataset Import Query</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Dataset Import Query</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Table Import Query</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Table Import Query</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model A Table Query</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Model B Table Query</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleSmodelRows.map((row) => (
+                        <tr key={row.key} className={row.status === 'MATCH' ? 'bg-white' : 'bg-rose-50/40'}>
+                          <td className="border border-slate-200 px-3 py-2">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.15em] ${
+                                row.status === 'MATCH' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                              }`}
+                            >
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">
+                            {row.mismatchFields.length ? row.mismatchFields.join(', ') : '-'}
+                          </td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.datasetId || '-'}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.datasetName || '-'}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.schemaName || '-'}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.tableId || '-'}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.tableName || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableType === row.rightTableType ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftTableType || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableType === row.rightTableType ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightTableType || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableExpression === row.rightTableExpression ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftTableExpression || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableExpression === row.rightTableExpression ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightTableExpression || '-'}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnId || '-'}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnName || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDisplayName === row.rightDisplayName ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftDisplayName || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDisplayName === row.rightDisplayName ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightDisplayName || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDescription === row.rightDescription ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftDescription || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDescription === row.rightDescription ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightDescription || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDataType === row.rightDataType ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftDataType || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDataType === row.rightDataType ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightDataType || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftHidden === row.rightHidden ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftHidden || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftHidden === row.rightHidden ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightHidden || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftExpression === row.rightExpression ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftExpression || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftExpression === row.rightExpression ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightExpression || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDatasetImportQuery === row.rightDatasetImportQuery ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftDatasetImportQuery || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftDatasetImportQuery === row.rightDatasetImportQuery ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightDatasetImportQuery || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableImportQuery === row.rightTableImportQuery ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftTableImportQuery || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableImportQuery === row.rightTableImportQuery ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightTableImportQuery || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableQuery === row.rightTableQuery ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftTableQuery || '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.leftTableQuery === row.rightTableQuery ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightTableQuery || '-'}</td>
+                        </tr>
+                      ))}
+                      {visibleSmodelRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={28} className="border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                            No rows found for the selected filter.
+                          </td>
+                        </tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : null}
           </section>

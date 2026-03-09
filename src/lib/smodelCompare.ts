@@ -6,6 +6,7 @@ import path from 'node:path';
 
 export interface SmodelCompareRunResult {
   outputPath: string;
+  jsonOutputPath?: string;
   stdout: string;
   stderr: string;
 }
@@ -30,7 +31,11 @@ export async function cleanupTempFiles(paths: Array<string | undefined | null>):
   );
 }
 
-export async function runSmodelCompare(modelAPath: string, modelBPath: string): Promise<SmodelCompareRunResult> {
+export async function runSmodelCompare(
+  modelAPath: string,
+  modelBPath: string,
+  jsonOutputPath?: string
+): Promise<SmodelCompareRunResult> {
   const scriptPath = path.join(process.cwd(), 'scripts', 'sisense_smodel_comparison_extract.py');
   const outputPath = path.join(os.tmpdir(), `smodel-compare-${randomUUID()}.xlsx`);
   const venvPythonPath = path.join(process.cwd(), '.venv', 'bin', 'python3');
@@ -38,9 +43,13 @@ export async function runSmodelCompare(modelAPath: string, modelBPath: string): 
     .access(venvPythonPath)
     .then(() => venvPythonPath)
     .catch(() => 'python3');
+  const args = [scriptPath, modelAPath, modelBPath, '--out', outputPath];
+  if (jsonOutputPath) {
+    args.push('--json-out', jsonOutputPath);
+  }
 
   return new Promise<SmodelCompareRunResult>((resolve, reject) => {
-    const child = spawn(pythonCommand, [scriptPath, modelAPath, modelBPath, '--out', outputPath], {
+    const child = spawn(pythonCommand, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -72,7 +81,7 @@ export async function runSmodelCompare(modelAPath: string, modelBPath: string): 
         return;
       }
 
-      resolve({ outputPath, stdout, stderr });
+      resolve({ outputPath, jsonOutputPath, stdout, stderr });
     });
   });
 }
