@@ -1,25 +1,30 @@
 import { NextResponse } from 'next/server';
-import { normalizeBaseUrl, sanitizeBearerToken } from '@/lib/network';
+import { normalizeBaseUrl } from '@/lib/network';
+import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
 interface RunRequestBody {
   url?: string;
   token?: string;
+  username?: string;
+  password?: string;
 }
 
 export async function POST(req: Request) {
   try {
-    const { url, token } = (await req.json()) as RunRequestBody;
+    const body = (await req.json()) as RunRequestBody;
+    const { url } = body;
 
-    if (!url || !token) {
-      return NextResponse.json({ error: 'URL and Token are required' }, { status: 400 });
+    if (!url || !hasSisenseAuth(body)) {
+      return NextResponse.json({ error: 'URL and credentials are required' }, { status: 400 });
     }
 
     const baseUrl = normalizeBaseUrl(url);
+    const token = await resolveSisenseBearer(baseUrl, body);
 
     const response = await fetch(`${baseUrl}/api/v1/dashboards`, {
       method: 'GET',
       headers: {
-        Authorization: `Bearer ${sanitizeBearerToken(token)}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       cache: 'no-store',

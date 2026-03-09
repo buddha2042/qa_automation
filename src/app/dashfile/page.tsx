@@ -19,8 +19,8 @@ interface DashboardResult {
 }
 
 interface ConfigState {
-  regular: { url: string; token: string };
-  refactor: { url: string; token: string };
+  regular: { url: string; username: string; password: string };
+  refactor: { url: string; username: string; password: string };
 }
 
 interface SisenseDashboard {
@@ -48,12 +48,12 @@ const isValidHttpUrl = (value: string) => {
 
 export default function QaCapturePage() {
   const [config, setConfig] = useState<ConfigState>({
-    regular: { url: SISENSE_BASE_URLS.regular, token: '' },
-    refactor: { url: SISENSE_BASE_URLS.refactor, token: '' },
+    regular: { url: SISENSE_BASE_URLS.sisense_25_4_sp2, username: '', password: '' },
+    refactor: { url: SISENSE_BASE_URLS.sisense_25_4_sp2, username: '', password: '' },
   });
   const [urlPresets, setUrlPresets] = useState<Record<Environment, BaseUrlPreset>>({
-    regular: 'regular',
-    refactor: 'refactor',
+    regular: 'sisense_25_4_sp2',
+    refactor: 'sisense_25_4_sp2',
   });
 
   const [results, setResults] = useState<Record<Environment, DashboardResult[]>>({
@@ -109,12 +109,12 @@ export default function QaCapturePage() {
   };
 
   const fetchInventory = async (env: Environment) => {
-    const { url, token } = config[env];
+    const { url, username, password } = config[env];
     const trimmedUrl = url.trim();
-    const trimmedToken = token.trim();
+    const trimmedUsername = username.trim();
 
-    if (!trimmedUrl || !trimmedToken) {
-      setError(`Please provide both URL and Token for ${env}`);
+    if (!trimmedUrl || !trimmedUsername || !password) {
+      setError(`Please provide URL, username, and password for ${env}`);
       return;
     }
 
@@ -130,7 +130,7 @@ export default function QaCapturePage() {
       const res = await fetch('/api/runs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl: trimmedUrl, token: trimmedToken }),
+        body: JSON.stringify({ baseUrl: trimmedUrl, username: trimmedUsername, password }),
       });
 
       const json = await res.json();
@@ -222,10 +222,20 @@ export default function QaCapturePage() {
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
                   />
                   <input
+                    placeholder="User ID / Email"
+                    value={config[env].username}
+                    onChange={(e) =>
+                      setConfig({ ...config, [env]: { ...config[env], username: e.target.value } })
+                    }
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
+                  />
+                  <input
                     type="password"
-                    placeholder="API Token (JWT)"
-                    value={config[env].token}
-                    onChange={(e) => setConfig({ ...config, [env]: { ...config[env], token: e.target.value } })}
+                    placeholder="Password"
+                    value={config[env].password}
+                    onChange={(e) =>
+                      setConfig({ ...config, [env]: { ...config[env], password: e.target.value } })
+                    }
                     className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder:text-slate-400"
                   />
                   <button

@@ -14,11 +14,13 @@ import {
 
 type Environment = 'regular' | 'refactor';
 type MatchBasis = 'dashboard_id' | 'dashboard_title';
+type WidgetMatchBasis = 'widget_id' | 'widget_title' | 'widget_position';
 type WidgetRunStatus = 'NOT_RUN' | 'RUNNING' | 'MATCH' | 'MISMATCH' | 'ERROR';
 
 interface EnvConfig {
   url: string;
-  token: string;
+  username: string;
+  password: string;
 }
 
 interface ConfigState {
@@ -51,12 +53,20 @@ interface DashboardItem {
   widgetTitles: Record<string, string>;
 }
 
+interface MatchedWidget {
+  regularWidgetId: string;
+  refactorWidgetId: string;
+  regularTitle?: string;
+  refactorTitle?: string;
+  matchBasis: WidgetMatchBasis;
+}
+
 interface MatchedDashboard {
   regularDashboardId: string;
   refactorDashboardId: string;
   regularTitle: string;
   refactorTitle: string;
-  matchedWidgets: string[];
+  matchedWidgets: MatchedWidget[];
   regularWidgetTitles: Record<string, string>;
   refactorWidgetTitles: Record<string, string>;
   matchBasis: MatchBasis;
@@ -66,7 +76,8 @@ interface WidgetCompareResult {
   key: string;
   regularDashboardId: string;
   refactorDashboardId: string;
-  widgetId: string;
+  regularWidgetId: string;
+  refactorWidgetId: string;
   status: Exclude<WidgetRunStatus, 'NOT_RUN' | 'RUNNING'>;
   diffCount: number;
   reason?: string;
@@ -94,9 +105,11 @@ interface WidgetCompareResult {
 
 interface WidgetInspectPrefill {
   regUrl: string;
-  regToken: string;
+  regUsername: string;
+  regPassword: string;
   refUrl: string;
-  refToken: string;
+  refUsername: string;
+  refPassword: string;
   regDashId: string;
   refDashId: string;
   regWidgetId: string;
@@ -142,8 +155,13 @@ const extractWidgetMeta = (layout?: SisenseDashboard['layout']) => {
   };
 };
 
-const widgetKey = (regularDashboardId: string, refactorDashboardId: string, widgetId: string): string =>
-  `${regularDashboardId}::${refactorDashboardId}::${widgetId}`;
+const widgetKey = (
+  regularDashboardId: string,
+  refactorDashboardId: string,
+  regularWidgetId: string,
+  refactorWidgetId: string
+): string =>
+  `${regularDashboardId}::${refactorDashboardId}::${regularWidgetId}::${refactorWidgetId}`;
 
 const toCsv = (rows: string[][]): string =>
   rows
@@ -154,12 +172,12 @@ export default function DashboardInspectorPage() {
   const { setQaState } = useQa();
 
   const [config, setConfig] = useState<ConfigState>({
-    regular: { url: SISENSE_BASE_URLS.regular, token: '' },
-    refactor: { url: SISENSE_BASE_URLS.refactor, token: '' },
+    regular: { url: SISENSE_BASE_URLS.sisense_25_4_sp2, username: '', password: '' },
+    refactor: { url: SISENSE_BASE_URLS.sisense_25_4_sp2, username: '', password: '' },
   });
   const [urlPresets, setUrlPresets] = useState<Record<Environment, BaseUrlPreset>>({
-    regular: 'regular',
-    refactor: 'refactor',
+    regular: 'sisense_25_4_sp2',
+    refactor: 'sisense_25_4_sp2',
   });
 
   const [inventories, setInventories] = useState<Record<Environment, DashboardItem[]>>({
@@ -177,8 +195,10 @@ export default function DashboardInspectorPage() {
   const canFetchMatches =
     isValidHttpUrl(config.regular.url.trim()) &&
     isValidHttpUrl(config.refactor.url.trim()) &&
-    config.regular.token.trim().length > 20 &&
-    config.refactor.token.trim().length > 20;
+    config.regular.username.trim().length > 0 &&
+    config.regular.password.length > 0 &&
+    config.refactor.username.trim().length > 0 &&
+    config.refactor.password.length > 0;
 
   const matchedDashboards = useMemo<MatchedDashboard[]>(() => {
     const results: MatchedDashboard[] = [];
@@ -200,8 +220,79 @@ export default function DashboardInspectorPage() {
       refactorDash: DashboardItem,
       matchBasis: MatchBasis
     ) => {
+      const matchedWidgets: MatchedWidget[] = [];
+      const usedRegularWidgetIds = new Set<string>();
+      const usedRefactorWidgetIds = new Set<string>();
+
       const refWidgetSet = new Set(refactorDash.widgets);
-      const matchedWidgets = regularDash.widgets.filter((id) => refWidgetSet.has(id));
+      for (const regularWidgetId of regularDash.widgets) {
+        if (!refWidgetSet.has(regularWidgetId)) continue;
+        matchedWidgets.push({
+          regularWidgetId,
+          refactorWidgetId: regularWidgetId,
+          regularTitle: regularDash.widgetTitles[regularWidgetId],
+          refactorTitle: refactorDash.widgetTitles[regularWidgetId],
+          matchBasis: 'widget_id',
+        });
+        usedRegularWidgetIds.add(regularWidgetId);
+        usedRefactorWidgetIds.add(regularWidgetId);
+      }
+
+      const regularWidgetsByTitle = new Map<string, string[]>();
+      for (const regularWidgetId of regularDash.widgets) {
+        if (usedRegularWidgetIds.has(regularWidgetId)) continue;
+        const title = regularDash.widgetTitles[regularWidgetId];
+        if (!title) continue;
+        const key = normalizeTitle(title);
+        const bucket = regularWidgetsByTitle.get(key) ?? [];
+        bucket.push(regularWidgetId);
+        regularWidgetsByTitle.set(key, bucket);
+      }
+
+      for (const refactorWidgetId of refactorDash.widgets) {
+        if (usedRefactorWidgetIds.has(refactorWidgetId)) continue;
+        const refactorTitle = refactorDash.widgetTitles[refactorWidgetId];
+        if (!refactorTitle) continue;
+        const key = normalizeTitle(refactorTitle);
+        const candidates = regularWidgetsByTitle.get(key) ?? [];
+        const regularWidgetId = candidates.find((id) => !usedRegularWidgetIds.has(id));
+        if (!regularWidgetId) continue;
+        matchedWidgets.push({
+          regularWidgetId,
+          refactorWidgetId,
+          regularTitle: regularDash.widgetTitles[regularWidgetId],
+          refactorTitle,
+          matchBasis: 'widget_title',
+        });
+        usedRegularWidgetIds.add(regularWidgetId);
+        usedRefactorWidgetIds.add(refactorWidgetId);
+      }
+
+      const remainingRegularWidgetIds = regularDash.widgets.filter(
+        (widgetId) => !usedRegularWidgetIds.has(widgetId)
+      );
+      const remainingRefactorWidgetIds = refactorDash.widgets.filter(
+        (widgetId) => !usedRefactorWidgetIds.has(widgetId)
+      );
+
+      const fallbackPairCount = Math.min(
+        remainingRegularWidgetIds.length,
+        remainingRefactorWidgetIds.length
+      );
+
+      for (let index = 0; index < fallbackPairCount; index += 1) {
+        const regularWidgetId = remainingRegularWidgetIds[index];
+        const refactorWidgetId = remainingRefactorWidgetIds[index];
+        matchedWidgets.push({
+          regularWidgetId,
+          refactorWidgetId,
+          regularTitle: regularDash.widgetTitles[regularWidgetId],
+          refactorTitle: refactorDash.widgetTitles[refactorWidgetId],
+          matchBasis: 'widget_position',
+        });
+        usedRegularWidgetIds.add(regularWidgetId);
+        usedRefactorWidgetIds.add(refactorWidgetId);
+      }
 
       usedRegularIds.add(regularDash.dashboardId);
       usedRefactorIds.add(refactorDash.dashboardId);
@@ -254,12 +345,16 @@ export default function DashboardInspectorPage() {
   }, [inventories, matchedDashboards, compareResults]);
 
   const fetchEnvDashboards = async (env: Environment): Promise<DashboardItem[]> => {
-    const { url, token } = config[env];
+    const { url, username, password } = config[env];
 
     const response = await fetch('/api/runs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ baseUrl: url.trim(), token: token.trim() }),
+      body: JSON.stringify({
+        baseUrl: url.trim(),
+        username: username.trim(),
+        password,
+      }),
     });
 
     const json = (await response.json()) as { data?: unknown; error?: string };
@@ -280,7 +375,7 @@ export default function DashboardInspectorPage() {
 
   const fetchMatches = async () => {
     if (!canFetchMatches) {
-      setError('Please enter valid URLs and tokens for both environments.');
+      setError('Please enter valid URLs, usernames, and passwords for both environments.');
       return;
     }
 
@@ -308,14 +403,20 @@ export default function DashboardInspectorPage() {
   const compareSingleWidget = async (
     regularDashboardId: string,
     refactorDashboardId: string,
-    widgetId: string
+    regularWidgetId: string,
+    refactorWidgetId: string
   ) => {
     if (!canFetchMatches) {
-      setError('Please enter valid URLs and tokens for both environments.');
+      setError('Please enter valid URLs, usernames, and passwords for both environments.');
       return;
     }
 
-    const key = widgetKey(regularDashboardId, refactorDashboardId, widgetId);
+    const key = widgetKey(
+      regularDashboardId,
+      refactorDashboardId,
+      regularWidgetId,
+      refactorWidgetId
+    );
     if (runningWidgets[key]) {
       return;
     }
@@ -330,13 +431,23 @@ export default function DashboardInspectorPage() {
         body: JSON.stringify({
           regular: {
             url: config.regular.url.trim(),
-            token: config.regular.token.trim(),
+            username: config.regular.username.trim(),
+            password: config.regular.password,
           },
           refactor: {
             url: config.refactor.url.trim(),
-            token: config.refactor.token.trim(),
+            username: config.refactor.username.trim(),
+            password: config.refactor.password,
           },
-          selections: [{ key, regularDashboardId, refactorDashboardId, widgetId }],
+          selections: [
+            {
+              key,
+              regularDashboardId,
+              refactorDashboardId,
+              regularWidgetId,
+              refactorWidgetId,
+            },
+          ],
         }),
       });
 
@@ -372,7 +483,8 @@ export default function DashboardInspectorPage() {
       [
         'Regular Dashboard ID',
         'Refactor Dashboard ID',
-        'Widget ID',
+        'Regular Widget ID',
+        'Refactor Widget ID',
         'Status',
         'Diff Count',
         'Reason',
@@ -380,7 +492,8 @@ export default function DashboardInspectorPage() {
       ...rows.map((r) => [
         r.regularDashboardId,
         r.refactorDashboardId,
-        r.widgetId,
+        r.regularWidgetId,
+        r.refactorWidgetId,
         r.status,
         String(r.diffCount),
         r.reason ?? '',
@@ -431,21 +544,26 @@ export default function DashboardInspectorPage() {
         [
           'Regular Dashboard ID',
           'Refactor Dashboard ID',
-          'Widget ID',
+          'Regular Widget ID',
+          'Refactor Widget ID',
           'Status',
           'Reason',
         ],
         [
           result.regularDashboardId,
           result.refactorDashboardId,
-          result.widgetId,
+          result.regularWidgetId,
+          result.refactorWidgetId,
           result.status,
           result.reason ?? 'Output data unavailable for this widget.',
         ],
       ]);
     }
 
-    const safeWidgetId = result.widgetId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeWidgetId = `${result.regularWidgetId}_${result.refactorWidgetId}`.replace(
+      /[^a-zA-Z0-9_-]/g,
+      '_'
+    );
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -456,13 +574,15 @@ export default function DashboardInspectorPage() {
   const inspectWidget = (result: WidgetCompareResult) => {
     const payload: WidgetInspectPrefill = {
       regUrl: config.regular.url.trim(),
-      regToken: config.regular.token.trim(),
+      regUsername: config.regular.username.trim(),
+      regPassword: config.regular.password,
       refUrl: config.refactor.url.trim(),
-      refToken: config.refactor.token.trim(),
+      refUsername: config.refactor.username.trim(),
+      refPassword: config.refactor.password,
       regDashId: result.regularDashboardId,
       refDashId: result.refactorDashboardId,
-      regWidgetId: result.widgetId,
-      refWidgetId: result.widgetId,
+      regWidgetId: result.regularWidgetId,
+      refWidgetId: result.refactorWidgetId,
       createdAt: new Date().toISOString(),
     };
 
@@ -473,9 +593,11 @@ export default function DashboardInspectorPage() {
       ...prev,
       inputs: {
         regUrl: payload.regUrl,
-        regToken: payload.regToken,
+        regUsername: payload.regUsername,
+        regPassword: payload.regPassword,
         refUrl: payload.refUrl,
-        refToken: payload.refToken,
+        refUsername: payload.refUsername,
+        refPassword: payload.refPassword,
         regDashId: payload.regDashId,
         refDashId: payload.refDashId,
         regWidgetId: payload.regWidgetId,
@@ -566,13 +688,25 @@ export default function DashboardInspectorPage() {
                 />
 
                 <input
-                  type="password"
-                  placeholder="Bearer Token"
-                  value={config[env].token}
+                  placeholder="User ID / Email"
+                  value={config[env].username}
                   onChange={(e) =>
                     setConfig((prev) => ({
                       ...prev,
-                      [env]: { ...prev[env], token: e.target.value },
+                      [env]: { ...prev[env], username: e.target.value },
+                    }))
+                  }
+                  className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={config[env].password}
+                  onChange={(e) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      [env]: { ...prev[env], password: e.target.value },
                     }))
                   }
                   className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-mono outline-none focus:ring-2 focus:ring-blue-500 transition-all"
@@ -702,15 +836,14 @@ export default function DashboardInspectorPage() {
 
                           {dash.matchedWidgets.length > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {dash.matchedWidgets.map((widgetId) => {
+                              {dash.matchedWidgets.map((widget) => {
                                 const key = widgetKey(
                                   dash.regularDashboardId,
                                   dash.refactorDashboardId,
-                                  widgetId
+                                  widget.regularWidgetId,
+                                  widget.refactorWidgetId
                                 );
-                                const widgetTitle =
-                                  dash.regularWidgetTitles[widgetId] ??
-                                  dash.refactorWidgetTitles[widgetId];
+                                const widgetTitle = widget.regularTitle ?? widget.refactorTitle;
                                 const status = getWidgetStatus(key);
                                 const result = compareResults[key];
                                 const canInspect = Boolean(result);
@@ -732,9 +865,36 @@ export default function DashboardInspectorPage() {
                                         </>
                                       ) : null}
                                       <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 pt-1">
-                                        Widget ID
+                                        Widget Match
                                       </div>
-                                      <code className="text-[11px] font-mono text-slate-700 break-all">{widgetId}</code>
+                                      {widget.regularWidgetId === widget.refactorWidgetId ? (
+                                        <code className="text-[11px] font-mono text-slate-700 break-all">
+                                          {widget.regularWidgetId}
+                                        </code>
+                                      ) : (
+                                        <div className="space-y-1">
+                                          <div className="text-[11px] text-slate-600">
+                                            <span className="font-semibold">Regular:</span>{' '}
+                                            <code className="font-mono break-all">
+                                              {widget.regularWidgetId}
+                                            </code>
+                                          </div>
+                                          <div className="text-[11px] text-slate-600">
+                                            <span className="font-semibold">Refactor:</span>{' '}
+                                            <code className="font-mono break-all">
+                                              {widget.refactorWidgetId}
+                                            </code>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                        Match Basis:{' '}
+                                        {widget.matchBasis === 'widget_id'
+                                          ? 'ID'
+                                          : widget.matchBasis === 'widget_title'
+                                            ? 'TITLE'
+                                            : 'POSITION'}
+                                      </div>
                                       {result?.reason ? (
                                         <p className="text-[10px] text-rose-600 mt-1 line-clamp-2">{result.reason}</p>
                                       ) : null}
@@ -762,7 +922,8 @@ export default function DashboardInspectorPage() {
                                           compareSingleWidget(
                                             dash.regularDashboardId,
                                             dash.refactorDashboardId,
-                                            widgetId
+                                            widget.regularWidgetId,
+                                            widget.refactorWidgetId
                                           )
                                         }
                                         disabled={status === 'RUNNING'}

@@ -13,7 +13,6 @@ import {
   getPresetFromUrl,
   getUrlForPreset,
   type BaseUrlPreset,
-  type Environment as UrlEnvironment,
   SISENSE_BASE_URLS,
 } from '@/lib/sisenseEnvironments';
 import {
@@ -27,12 +26,14 @@ import {
 } from './types';
 
 const EMPTY_INPUTS: QaInputs = {
-  regUrl: SISENSE_BASE_URLS.regular,
-  regToken: '',
+  regUrl: SISENSE_BASE_URLS.sisense_25_4_sp2,
+  regUsername: '',
+  regPassword: '',
   regDashId: '',
   regWidgetId: '',
-  refUrl: SISENSE_BASE_URLS.refactor,
-  refToken: '',
+  refUrl: SISENSE_BASE_URLS.sisense_25_4_sp2,
+  refUsername: '',
+  refPassword: '',
   refDashId: '',
   refWidgetId: '',
 };
@@ -153,11 +154,13 @@ const getEnvConfig = (inputs: QaInputs, env: Environment) =>
   env === 'regular'
     ? {
         url: inputs.regUrl.trim(),
-        token: inputs.regToken.trim(),
+        username: inputs.regUsername.trim(),
+        password: inputs.regPassword,
       }
     : {
         url: inputs.refUrl.trim(),
-        token: inputs.refToken.trim(),
+        username: inputs.refUsername.trim(),
+        password: inputs.refPassword,
       };
 
 const hasQueryMetadata = (payload: WidgetPayloadTyped): boolean =>
@@ -258,9 +261,9 @@ export default function WidgetComparePage() {
   const widgetPreviewRef = useRef<HTMLElement>(null);
 
   const [inputs, setInputs] = useState<QaInputs>(EMPTY_INPUTS);
-  const [urlPresets, setUrlPresets] = useState<Record<UrlEnvironment, BaseUrlPreset>>({
-    regular: 'regular',
-    refactor: 'refactor',
+  const [urlPresets, setUrlPresets] = useState<Record<Environment, BaseUrlPreset>>({
+    regular: 'sisense_25_4_sp2',
+    refactor: 'sisense_25_4_sp2',
   });
 
   const [regularData, setRegularData] = useState<WidgetPayload | null>(null);
@@ -286,7 +289,7 @@ export default function WidgetComparePage() {
 
   const resetWidgetPageState = useCallback(() => {
     setInputs(EMPTY_INPUTS);
-    setUrlPresets({ regular: 'regular', refactor: 'refactor' });
+    setUrlPresets({ regular: 'sisense_25_4_sp2', refactor: 'sisense_25_4_sp2' });
     setRegularData(null);
     setRefactorData(null);
     setComparisonReport([]);
@@ -329,11 +332,13 @@ export default function WidgetComparePage() {
       const prefilledInputs: QaInputs = {
         ...EMPTY_INPUTS,
         regUrl: typeof parsed.regUrl === 'string' ? parsed.regUrl : '',
-        regToken: typeof parsed.regToken === 'string' ? parsed.regToken : '',
+        regUsername: typeof parsed.regUsername === 'string' ? parsed.regUsername : '',
+        regPassword: typeof parsed.regPassword === 'string' ? parsed.regPassword : '',
         regDashId: typeof parsed.regDashId === 'string' ? parsed.regDashId : '',
         regWidgetId: typeof parsed.regWidgetId === 'string' ? parsed.regWidgetId : '',
         refUrl: typeof parsed.refUrl === 'string' ? parsed.refUrl : '',
-        refToken: typeof parsed.refToken === 'string' ? parsed.refToken : '',
+        refUsername: typeof parsed.refUsername === 'string' ? parsed.refUsername : '',
+        refPassword: typeof parsed.refPassword === 'string' ? parsed.refPassword : '',
         refDashId: typeof parsed.refDashId === 'string' ? parsed.refDashId : '',
         refWidgetId: typeof parsed.refWidgetId === 'string' ? parsed.refWidgetId : '',
       };
@@ -409,7 +414,7 @@ export default function WidgetComparePage() {
     setInputs((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleUrlPresetChange = (env: UrlEnvironment, preset: BaseUrlPreset) => {
+  const handleUrlPresetChange = (env: Environment, preset: BaseUrlPreset) => {
     setUrlPresets((prev) => ({ ...prev, [env]: preset }));
     const field: keyof QaInputs = env === 'regular' ? 'regUrl' : 'refUrl';
     setInputs((prev) => ({
@@ -418,7 +423,7 @@ export default function WidgetComparePage() {
     }));
   };
 
-  const handleUrlInputChange = (env: UrlEnvironment, value: string) => {
+  const handleUrlInputChange = (env: Environment, value: string) => {
     const field: keyof QaInputs = env === 'regular' ? 'regUrl' : 'refUrl';
     setInputs((prev) => ({ ...prev, [field]: value }));
     setUrlPresets((prev) => ({ ...prev, [env]: getPresetFromUrl(value) }));
@@ -427,11 +432,29 @@ export default function WidgetComparePage() {
   const handleFetch = async (env: Environment) => {
     const isReg = env === 'regular';
     const config = isReg
-      ? { url: inputs.regUrl, token: inputs.regToken, dId: inputs.regDashId, wId: inputs.regWidgetId }
-      : { url: inputs.refUrl, token: inputs.refToken, dId: inputs.refDashId, wId: inputs.refWidgetId };
+      ? {
+          url: inputs.regUrl,
+          username: inputs.regUsername,
+          password: inputs.regPassword,
+          dId: inputs.regDashId,
+          wId: inputs.regWidgetId,
+        }
+      : {
+          url: inputs.refUrl,
+          username: inputs.refUsername,
+          password: inputs.refPassword,
+          dId: inputs.refDashId,
+          wId: inputs.refWidgetId,
+        };
 
-    if (!isValidHttpUrl(config.url.trim()) || !config.token.trim() || !config.dId.trim() || !config.wId.trim()) {
-      setError(`Valid URL, token, dashboard ID and widget ID are required for ${env}.`);
+    if (
+      !isValidHttpUrl(config.url.trim()) ||
+      !config.username.trim() ||
+      !config.password ||
+      !config.dId.trim() ||
+      !config.wId.trim()
+    ) {
+      setError(`Valid URL, username, password, dashboard ID and widget ID are required for ${env}.`);
       return;
     }
 
@@ -444,7 +467,8 @@ export default function WidgetComparePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: config.url.trim(),
-          token: config.token.trim(),
+          username: config.username.trim(),
+          password: config.password,
           dashboardId: config.dId.trim(),
           widgetId: config.wId.trim(),
           environment: env,
@@ -481,9 +505,9 @@ export default function WidgetComparePage() {
     setLoading((prev) => ({ ...prev, [loadingKey]: true }));
 
     try {
-      if (!isValidHttpUrl(config.url) || !config.token) {
+      if (!isValidHttpUrl(config.url) || !config.username || !config.password) {
         setPreviewRows((prev) => ({ ...prev, [env]: [] }));
-        setError(`${env} preview query skipped: missing API URL or token.`);
+        setError(`${env} preview query skipped: missing API URL or credentials.`);
         return;
       }
 
@@ -491,11 +515,12 @@ export default function WidgetComparePage() {
         const fullDataRes = await fetch('/api/widget/fetch-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url: config.url,
-            token: config.token,
-            widgetPayload: payload,
-          }),
+        body: JSON.stringify({
+          url: config.url,
+          username: config.username,
+          password: config.password,
+          widgetPayload: payload,
+        }),
         });
 
         const fullDataJson = (await fullDataRes.json()) as {
@@ -533,7 +558,8 @@ export default function WidgetComparePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           baseUrl: config.url,
-          token: config.token,
+          username: config.username,
+          password: config.password,
           datasource: datasourceFullname,
           jaql: {
             ...jaqlBody,
@@ -719,10 +745,15 @@ export default function WidgetComparePage() {
                       disabled={urlPresets[env] !== 'manual'}
                     />
                     <InputField
-                      placeholder="Bearer Token"
+                      placeholder="User ID / Email"
+                      value={inputs[`${prefix}Username` as keyof QaInputs]}
+                      onChange={(v) => handleInputChange(`${prefix}Username` as keyof QaInputs, v)}
+                    />
+                    <InputField
+                      placeholder="Password"
                       type="password"
-                      value={inputs[`${prefix}Token` as keyof QaInputs]}
-                      onChange={(v) => handleInputChange(`${prefix}Token` as keyof QaInputs, v)}
+                      value={inputs[`${prefix}Password` as keyof QaInputs]}
+                      onChange={(v) => handleInputChange(`${prefix}Password` as keyof QaInputs, v)}
                     />
                     <div className="grid grid-cols-2 gap-4">
                       <InputField

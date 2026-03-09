@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { normalizeBaseUrl, sanitizeBearerToken } from '@/lib/network';
+import { normalizeBaseUrl } from '@/lib/network';
+import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
 interface JaqlMetadataItem {
   panel?: string;
@@ -27,6 +28,8 @@ interface JaqlPayload {
 interface JaqlRequestBody {
   baseUrl?: string;
   token?: string;
+  username?: string;
+  password?: string;
   datasource?: string;
   jaql?: JaqlPayload;
 }
@@ -53,16 +56,17 @@ export async function POST(req: Request) {
 
   try {
     const body = (await req.json()) as JaqlRequestBody;
-    const { baseUrl, token, datasource, jaql } = body;
+    const { baseUrl, datasource, jaql, ...auth } = body;
 
-    if (!baseUrl || !token || !jaql) {
+    if (!baseUrl || !jaql || !hasSisenseAuth(auth)) {
       return NextResponse.json(
-        { error: 'baseUrl, token, and jaql are required' },
+        { error: 'baseUrl, credentials, and jaql are required' },
         { status: 400 }
       );
     }
 
     const safeBaseUrl = normalizeBaseUrl(baseUrl);
+    const token = await resolveSisenseBearer(safeBaseUrl, auth);
     const metadataDatasource = readDatasourceFromMetadata(jaql.metadata);
     const datasourceFullname =
       datasource?.trim() || jaql.datasource?.fullname?.trim() || metadataDatasource || '';
@@ -140,7 +144,7 @@ export async function POST(req: Request) {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${sanitizeBearerToken(token)}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(jaqlPayload),
       signal: controller.signal,

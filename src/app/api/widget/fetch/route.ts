@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { normalizeBaseUrl, sanitizeBearerToken } from '@/lib/network';
+import { normalizeBaseUrl } from '@/lib/network';
+import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
 interface WidgetPanelItem {
   jaql?: unknown;
@@ -44,6 +45,8 @@ interface SisenseWidget {
 interface WidgetFetchRequest {
   url?: string;
   token?: string;
+  username?: string;
+  password?: string;
   dashboardId?: string;
   widgetId?: string;
   environment?: string;
@@ -91,17 +94,18 @@ function extractComparableWidget(widget: SisenseWidget) {
 
 export async function POST(req: Request) {
   try {
-    const { url, token, dashboardId, widgetId, environment } =
+    const { url, dashboardId, widgetId, environment, ...auth } =
       (await req.json()) as WidgetFetchRequest;
 
-    if (!url || !token || !dashboardId || !widgetId) {
+    if (!url || !dashboardId || !widgetId || !hasSisenseAuth(auth)) {
       return NextResponse.json(
-        { error: 'url, token, dashboardId, and widgetId are required' },
+        { error: 'url, credentials, dashboardId, and widgetId are required' },
         { status: 400 }
       );
     }
 
     const baseUrl = normalizeBaseUrl(url);
+    const token = await resolveSisenseBearer(baseUrl, auth);
     const widgetUrl = `${baseUrl}/api/v1/dashboards/${encodeURIComponent(
       dashboardId
     )}/widgets/${encodeURIComponent(widgetId)}`;
@@ -109,7 +113,7 @@ export async function POST(req: Request) {
     const response = await fetch(widgetUrl, {
       method: 'GET',
       headers: {
-        authorization: `Bearer ${sanitizeBearerToken(token)}`,
+        authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       cache: 'no-store',

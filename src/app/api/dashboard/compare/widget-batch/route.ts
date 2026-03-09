@@ -4,10 +4,12 @@ import {
   type CompareSingleWidgetInput,
   type DashboardCompareCredentials,
 } from '@/lib/dashboardCompare';
+import { normalizeBaseUrl } from '@/lib/network';
+import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
 interface CompareBatchRequestBody {
-  regular?: { url?: string; token?: string };
-  refactor?: { url?: string; token?: string };
+  regular?: { url?: string; token?: string; username?: string; password?: string };
+  refactor?: { url?: string; token?: string; username?: string; password?: string };
   selections?: Array<
     CompareSingleWidgetInput & {
       key?: string;
@@ -24,9 +26,9 @@ export async function POST(req: Request) {
 
     if (
       !isNonEmpty(body.regular?.url) ||
-      !isNonEmpty(body.regular?.token) ||
+      !hasSisenseAuth(body.regular ?? {}) ||
       !isNonEmpty(body.refactor?.url) ||
-      !isNonEmpty(body.refactor?.token)
+      !hasSisenseAuth(body.refactor ?? {})
     ) {
       return NextResponse.json(
         { error: 'regular/refactor credentials are required' },
@@ -41,14 +43,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const regularUrl = normalizeBaseUrl(body.regular.url);
+    const refactorUrl = normalizeBaseUrl(body.refactor.url);
     const credentials: DashboardCompareCredentials = {
       regular: {
-        url: body.regular.url.trim(),
-        token: body.regular.token.trim(),
+        url: regularUrl,
+        token: await resolveSisenseBearer(regularUrl, body.regular),
       },
       refactor: {
-        url: body.refactor.url.trim(),
-        token: body.refactor.token.trim(),
+        url: refactorUrl,
+        token: await resolveSisenseBearer(refactorUrl, body.refactor),
       },
     };
 
@@ -58,7 +62,7 @@ export async function POST(req: Request) {
         return {
           key:
             selection.key ??
-            `${selection.regularDashboardId}::${selection.refactorDashboardId}::${selection.widgetId}`,
+            `${selection.regularDashboardId}::${selection.refactorDashboardId}::${selection.regularWidgetId}::${selection.refactorWidgetId}`,
           regularDashboardId: selection.regularDashboardId,
           refactorDashboardId: selection.refactorDashboardId,
           ...result,

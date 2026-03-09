@@ -19,11 +19,13 @@ export interface ComparisonItem {
 
 export interface QaInputs {
   regUrl: string;
-  regToken: string;
+  regUsername: string;
+  regPassword: string;
   regDashId: string;
   regWidgetId: string;
   refUrl: string;
-  refToken: string;
+  refUsername: string;
+  refPassword: string;
   refDashId: string;
   refWidgetId: string;
 }

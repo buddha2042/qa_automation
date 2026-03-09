@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { normalizeBaseUrl, sanitizeBearerToken } from '@/lib/network';
+import { normalizeBaseUrl } from '@/lib/network';
+import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
 interface WidgetPayload {
   datasource?: { fullname?: string };
@@ -13,6 +14,8 @@ interface WidgetPayload {
 interface FetchDataRequest {
   url?: string;
   token?: string;
+  username?: string;
+  password?: string;
   widgetPayload?: WidgetPayload;
 }
 
@@ -38,9 +41,9 @@ const normalizeDatasourceForBody = (fullname: string): { fullname: string } => (
 
 export async function POST(req: Request) {
   try {
-    const { url, token, widgetPayload } = (await req.json()) as FetchDataRequest;
+    const { url, widgetPayload, ...auth } = (await req.json()) as FetchDataRequest;
 
-    if (!url || !token || !widgetPayload) {
+    if (!url || !widgetPayload || !hasSisenseAuth(auth)) {
       return NextResponse.json(
         { error: 'Missing required parameters' },
         { status: 400 }
@@ -48,6 +51,7 @@ export async function POST(req: Request) {
     }
 
     const cleanBaseUrl = normalizeBaseUrl(url);
+    const token = await resolveSisenseBearer(cleanBaseUrl, auth);
     const datasourceFullname = readDatasourceFullname(widgetPayload);
     const metadata = widgetPayload.query?.metadata ?? [];
 
@@ -73,7 +77,7 @@ export async function POST(req: Request) {
       {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${sanitizeBearerToken(token)}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
