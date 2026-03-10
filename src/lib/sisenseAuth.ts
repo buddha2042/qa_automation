@@ -37,9 +37,16 @@ export async function resolveSisenseBearer(
   });
 
   const contentType = response.headers.get('content-type') ?? '';
-  const payload = contentType.includes('application/json')
-    ? ((await response.json()) as { access_token?: string; token?: string; message?: string; error?: { message?: string } })
-    : ({ message: await response.text() } as { message?: string; error?: { message?: string } });
+  type SisenseAuthResponse = {
+    access_token?: string;
+    token?: string;
+    message?: string;
+    error?: { message?: string };
+  };
+
+  const payload: SisenseAuthResponse = contentType.includes('application/json')
+    ? ((await response.json()) as SisenseAuthResponse)
+    : { message: await response.text() };
 
   if (!response.ok) {
     const message =
