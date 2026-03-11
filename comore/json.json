@@ -1,0 +1,1712 @@
+{
+    "_id": "69a6b6496d795c0033a8a5b0",
+    "title": "Recovery Reserves",
+    "type": "pivot2",
+    "subtype": "pivot2",
+    "oid": "69a6b6496d795c0033a8a514",
+    "desc": null,
+    "source": null,
+    "owner": "6877e633bbb1d1002dac5be2",
+    "userId": "6877e633bbb1d1002dac5be2",
+    "created": "2026-03-03T10:22:01.661Z",
+    "lastUpdated": "2026-03-11T12:52:42.054Z",
+    "instanceType": "owner",
+    "datasource": {
+        "address": "LocalHost",
+        "title": "SDAO - Production - Financial - Jan 2025 0001",
+        "id": "localhost_aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+        "database": "aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+        "fullname": "localhost/SDAO - Production - Financial - Jan 2025 0001",
+        "live": false
+    },
+    "selection": null,
+    "metadata": {
+        "ignore": {
+            "dimensions": [],
+            "ids": [],
+            "all": false
+        },
+        "panels": [
+            {
+                "name": "rows",
+                "items": [
+                    {
+                        "jaql": {
+                            "table": "Event",
+                            "column": "Event Date",
+                            "dim": "[Event.Event Date (Calendar)]",
+                            "datatype": "datetime",
+                            "merged": true,
+                            "level": "years",
+                            "title": "Years in Event Date"
+                        },
+                        "instanceid": "F9E67-29B5-25",
+                        "field": {
+                            "id": "[Event.Event Date (Calendar)]_years",
+                            "index": 0
+                        },
+                        "format": {
+                            "mask": {
+                                "years": "yyyy",
+                                "quarters": "yyyy Q",
+                                "months": "MM/yyyy",
+                                "weeks": "ww yyyy",
+                                "days": "MM/dd/yyyy",
+                                "minutes": "HH:mm",
+                                "dateAndTime": "MM/dd/yyyy HH:mm"
+                            }
+                        },
+                        "panel": "rows",
+                        "hierarchies": [
+                            "calendar"
+                        ]
+                    },
+                    {
+                        "jaql": {
+                            "table": "Adjuster Details",
+                            "column": "Adjuster Full Name",
+                            "dim": "[Adjuster Details.Adjuster Full Name]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Adjuster Full Name"
+                        },
+                        "instanceid": "1A2B6-9420-17",
+                        "field": {
+                            "id": "[Adjuster Details.Adjuster Full Name]",
+                            "index": 1
+                        },
+                        "panel": "rows"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Claim Number",
+                            "dim": "[Claim.Claim Number]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Claim Number"
+                        },
+                        "instanceid": "C93C9-6516-F5",
+                        "field": {
+                            "id": "[Claim.Claim Number]",
+                            "index": 2
+                        },
+                        "panel": "rows"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Coverage Desc",
+                            "dim": "[Claim.Coverage Desc]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Coverage Desc"
+                        },
+                        "instanceid": "1CE59-D7C4-05",
+                        "field": {
+                            "id": "[Claim.Coverage Desc]",
+                            "index": 3
+                        },
+                        "panel": "rows"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Claim Status Code",
+                            "dim": "[Claim.Claim Status Code]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Claim Status Code"
+                        },
+                        "instanceid": "4F3D1-26FC-58",
+                        "field": {
+                            "id": "[Claim.Claim Status Code]",
+                            "index": 4
+                        },
+                        "panel": "rows"
+                    }
+                ]
+            },
+            {
+                "name": "values",
+                "items": [
+                    {
+                        "jaql": {
+                            "table": "Reserve Current",
+                            "column": "Paid Total",
+                            "dim": "[Reserve Current.Paid Total]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Paid Total"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "275EB-FA86-39",
+                        "field": {
+                            "id": "[Reserve Current.Paid Total]_sum",
+                            "index": 5
+                        },
+                        "panel": "measures"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Financials - Claimants",
+                            "column": "Reserve Amount",
+                            "dim": "[Financials - Claimants.Reserve Amount]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Reserve Amount"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "989FB-6F76-63",
+                        "field": {
+                            "id": "[Financials - Claimants.Reserve Amount]_sum",
+                            "index": 6
+                        },
+                        "panel": "measures"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Reserve Current",
+                            "column": "Collection Total",
+                            "dim": "[Reserve Current.Collection Total]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Collection Total"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "FDACA-9544-BE",
+                        "field": {
+                            "id": "[Reserve Current.Collection Total]_sum",
+                            "index": 7
+                        },
+                        "panel": "measures"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim Supplemental",
+                            "column": "Recovery Reserve",
+                            "dim": "[Claim Supplemental.Recovery Reserve]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Recovery Reserve"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "3A4DE-57DC-2A",
+                        "field": {
+                            "id": "[Claim Supplemental.Recovery Reserve]_sum",
+                            "index": 8
+                        },
+                        "panel": "measures"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Reserve Current",
+                            "column": "Incurred Amount",
+                            "dim": "[Reserve Current.Incurred Amount]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Incurred Amount"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "C463D-B2D8-9F",
+                        "panel": "measures",
+                        "field": {
+                            "id": "[Reserve Current.Incurred Amount]_sum",
+                            "index": 9
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "columns",
+                "items": []
+            },
+            {
+                "name": "filters",
+                "items": [
+                    {
+                        "jaql": {
+                            "table": "Claim Supplemental",
+                            "column": "Recovery Reserve",
+                            "dim": "[Claim Supplemental.Recovery Reserve]",
+                            "datatype": "numeric",
+                            "filter": {
+                                "explicit": false,
+                                "multiSelection": true,
+                                "exclude": {
+                                    "members": [
+                                        "0",
+                                        "N\\A"
+                                    ]
+                                }
+                            },
+                            "collapsed": true,
+                            "title": "Recovery Reserve",
+                            "datasource": {
+                                "fullname": "localhost/SDAO - Production - Financial - Jan 2025 0001",
+                                "id": "localhost_aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                                "address": "LocalHost",
+                                "database": "aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                                "live": false,
+                                "title": "SDAO - Production - Financial - Jan 2025 0001"
+                            }
+                        },
+                        "instanceid": "58DF3-FD0A-0B",
+                        "panel": "scope"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Coverage Desc",
+                            "dim": "[Claim.Coverage Desc]",
+                            "datatype": "text",
+                            "merged": true,
+                            "filter": {
+                                "explicit": false,
+                                "multiSelection": true,
+                                "exclude": {
+                                    "members": [
+                                        "N\\A",
+                                        "Workers Compensation"
+                                    ]
+                                }
+                            },
+                            "collapsed": true,
+                            "title": "Coverage Desc",
+                            "datasource": {
+                                "fullname": "localhost/SDAO - Production - Financial - Jan 2025 0001",
+                                "id": "localhost_aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                                "address": "LocalHost",
+                                "database": "aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                                "live": false,
+                                "title": "SDAO - Production - Financial - Jan 2025 0001"
+                            }
+                        },
+                        "instanceid": "0CCFB-19AD-0A",
+                        "panel": "scope"
+                    }
+                ]
+            }
+        ],
+        "usedFormulasMapping": {}
+    },
+    "style": {
+        "scroll": false,
+        "pageSize": 25,
+        "automaticHeight": true,
+        "colors": {
+            "rows": true,
+            "columns": false,
+            "headers": false,
+            "members": false,
+            "totals": false
+        },
+        "narration": {
+            "enabled": false,
+            "display": "above",
+            "format": "bullets",
+            "verbosity": "medium",
+            "up_sentiment": "good",
+            "aggregation": "sum",
+            "labels": [
+                {
+                    "id": "days_in_event_date",
+                    "title": "Days in Event Date",
+                    "singular": "Days in Event Date",
+                    "plural": "Days in Event Date"
+                },
+                {
+                    "id": "adjuster_full_name",
+                    "title": "Adjuster Full Name",
+                    "singular": "Adjuster Full Name",
+                    "plural": "Adjuster Full Name"
+                },
+                {
+                    "id": "claim_number",
+                    "title": "Claim Number",
+                    "singular": "Claim Number",
+                    "plural": "Claim Number"
+                },
+                {
+                    "id": "coverage_desc",
+                    "title": "Coverage Desc",
+                    "singular": "Coverage Desc",
+                    "plural": "Coverage Desc"
+                },
+                {
+                    "id": "claim_status_code",
+                    "title": "Claim Status Code",
+                    "singular": "Claim Status Code",
+                    "plural": "Claim Status Code"
+                },
+                {
+                    "id": "recovery_reserve",
+                    "title": "Recovery Reserve",
+                    "singular": "Recovery Reserve",
+                    "plural": "Recovery Reserve"
+                }
+            ]
+        },
+        "jtdExcludedDims": [
+            "[Event.Event Date (Calendar)]",
+            "[Adjuster Details.Adjuster Full Name]",
+            "[Claim.Claim Number]",
+            "[Claim.Coverage Desc]",
+            "[Claim.Claim Status Code]",
+            "[Reserve Current.Paid Total]",
+            "[Financials - Claimants.Reserve Amount]",
+            "[Reserve Current.Collection Total]",
+            "[Claim Supplemental.Recovery Reserve]",
+            "[Reserve Current.Incurred Amount]"
+        ]
+    },
+    "instanceid": "E5BA0-625B-E3",
+    "headerHidden": false,
+    "drillToDashboardConfig": {
+        "drilledDashboardPrefix": "_drill",
+        "drilledDashboardsFolderPrefix": "",
+        "displayFilterPane": true,
+        "displayDashboardsPane": true,
+        "displayToolbarRow": true,
+        "displayHeaderRow": true,
+        "volatile": false,
+        "hideDrilledDashboards": true,
+        "hideSharedDashboardsForNonOwner": true,
+        "drillToDashboardRightMenuCaption": "Jump to ",
+        "drillToDashboardNavigateType": 2,
+        "drillToDashboardNavigateTypePivot": 2,
+        "drillToDashboardNavigateTypeCharts": 1,
+        "drillToDashboardNavigateTypeOthers": 3,
+        "excludeFilterDims": [],
+        "includeFilterDims": [],
+        "drilledDashboardDisplayType": 2,
+        "dashboardIds": [],
+        "modalWindowResize": false,
+        "modalWindowMeasurement": "%",
+        "showFolderNameOnMenuSelection": false,
+        "resetDashFiltersAfterJTD": false,
+        "sameCubeRestriction": true,
+        "showJTDIcon": true,
+        "sendPieChartMeasureFiltersOnClick": true,
+        "forceZeroInsteadNull": false,
+        "mergeTargetDashboardFilters": false,
+        "drillToDashboardByName": false,
+        "sendBreakByValueFilter": true,
+        "ignoreFiltersSource": false,
+        "sendFormulaFiltersDuplicate": "none"
+    },
+    "wasRendered": false,
+    "realTimeRefreshing": false,
+    "options": {
+        "dashboardFiltersMode": "filter",
+        "selector": false,
+        "triggersDomready": true,
+        "drillToAnywhere": true,
+        "autoUpdateOnEveryChange": true,
+        "interactivePivot": {
+            "enable": false
+        },
+        "availableExcludeDims": [
+            "[Event.Event Date (Calendar)]",
+            "[Adjuster Details.Adjuster Full Name]",
+            "[Claim.Claim Number]",
+            "[Claim.Coverage Desc]",
+            "[Claim.Claim Status Code]",
+            "[Reserve Current.Paid Total]",
+            "[Financials - Claimants.Reserve Amount]",
+            "[Reserve Current.Collection Total]",
+            "[Claim Supplemental.Recovery Reserve]",
+            "[Reserve Current.Incurred Amount]"
+        ],
+        "designPanelConfig": {
+            "shouldRender": false,
+            "selectedItem": -1
+        },
+        "imageColumns": []
+    },
+    "dashboardid": "69a6b6496d795c0033a8a513",
+    "query": {
+        "datasource": {
+            "fullname": "localhost/SDAO - Production - Financial - Jan 2025 0001",
+            "id": "localhost_aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+            "address": "LocalHost",
+            "database": "aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+            "live": false,
+            "title": "SDAO - Production - Financial - Jan 2025 0001"
+        },
+        "format": "pivot",
+        "grandTotals": {
+            "title": "Grand Total"
+        },
+        "metadata": [
+            {
+                "jaql": {
+                    "table": "Event",
+                    "column": "Event Date",
+                    "dim": "[Event.Event Date (Calendar)]",
+                    "datatype": "datetime",
+                    "merged": true,
+                    "level": "years",
+                    "title": "Years in Event Date"
+                },
+                "instanceid": "F9E67-29B5-25",
+                "field": {
+                    "id": "[Event.Event Date (Calendar)]_years",
+                    "index": 0
+                },
+                "format": {
+                    "mask": {
+                        "years": "yyyy",
+                        "quarters": "yyyy Q",
+                        "months": "MM/yyyy",
+                        "weeks": "ww yyyy",
+                        "days": "shortDate",
+                        "minutes": "HH:mm",
+                        "dateAndTime": "MM/dd/y HH:mm",
+                        "isdefault": true
+                    }
+                },
+                "panel": "rows",
+                "hierarchies": [
+                    "calendar",
+                    "calendar - weeks"
+                ],
+                "handlers": [
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Adjuster Details",
+                    "column": "Adjuster Full Name",
+                    "dim": "[Adjuster Details.Adjuster Full Name]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Adjuster Full Name"
+                },
+                "instanceid": "1A2B6-9420-17",
+                "field": {
+                    "id": "[Adjuster Details.Adjuster Full Name]",
+                    "index": 1
+                },
+                "panel": "rows",
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Claim Number",
+                    "dim": "[Claim.Claim Number]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Claim Number"
+                },
+                "instanceid": "C93C9-6516-F5",
+                "field": {
+                    "id": "[Claim.Claim Number]",
+                    "index": 2
+                },
+                "panel": "rows",
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Coverage Desc",
+                    "dim": "[Claim.Coverage Desc]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Coverage Desc"
+                },
+                "instanceid": "1CE59-D7C4-05",
+                "field": {
+                    "id": "[Claim.Coverage Desc]",
+                    "index": 3
+                },
+                "panel": "rows",
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Claim Status Code",
+                    "dim": "[Claim.Claim Status Code]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Claim Status Code"
+                },
+                "instanceid": "4F3D1-26FC-58",
+                "field": {
+                    "id": "[Claim.Claim Status Code]",
+                    "index": 4
+                },
+                "panel": "rows",
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Reserve Current",
+                    "column": "Paid Total",
+                    "dim": "[Reserve Current.Paid Total]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Paid Total"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "275EB-FA86-39",
+                "field": {
+                    "id": "[Reserve Current.Paid Total]_sum",
+                    "index": 5
+                },
+                "panel": "measures",
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Financials - Claimants",
+                    "column": "Reserve Amount",
+                    "dim": "[Financials - Claimants.Reserve Amount]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Reserve Amount"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "989FB-6F76-63",
+                "field": {
+                    "id": "[Financials - Claimants.Reserve Amount]_sum",
+                    "index": 6
+                },
+                "panel": "measures",
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Reserve Current",
+                    "column": "Collection Total",
+                    "dim": "[Reserve Current.Collection Total]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Collection Total"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "FDACA-9544-BE",
+                "field": {
+                    "id": "[Reserve Current.Collection Total]_sum",
+                    "index": 7
+                },
+                "panel": "measures",
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Claim Supplemental",
+                    "column": "Recovery Reserve",
+                    "dim": "[Claim Supplemental.Recovery Reserve]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Recovery Reserve"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "3A4DE-57DC-2A",
+                "field": {
+                    "id": "[Claim Supplemental.Recovery Reserve]_sum",
+                    "index": 8
+                },
+                "panel": "measures",
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Reserve Current",
+                    "column": "Incurred Amount",
+                    "dim": "[Reserve Current.Incurred Amount]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Incurred Amount"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "C463D-B2D8-9F",
+                "panel": "measures",
+                "field": {
+                    "id": "[Reserve Current.Incurred Amount]_sum",
+                    "index": 9
+                },
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Claim Supplemental",
+                    "column": "Recovery Reserve",
+                    "dim": "[Claim Supplemental.Recovery Reserve]",
+                    "datatype": "numeric",
+                    "filter": {
+                        "explicit": false,
+                        "multiSelection": true,
+                        "exclude": {
+                            "members": [
+                                "0",
+                                "N\\A"
+                            ]
+                        }
+                    },
+                    "collapsed": true,
+                    "title": "Recovery Reserve",
+                    "datasource": {
+                        "fullname": "localhost/SDAO - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "address": "LocalHost",
+                        "database": "aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "live": false,
+                        "title": "SDAO - Production - Financial - Jan 2025 0001"
+                    }
+                },
+                "instanceid": "58DF3-FD0A-0B",
+                "panel": "scope",
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Coverage Desc",
+                    "dim": "[Claim.Coverage Desc]",
+                    "datatype": "text",
+                    "merged": true,
+                    "filter": {
+                        "explicit": false,
+                        "multiSelection": true,
+                        "exclude": {
+                            "members": [
+                                "N\\A",
+                                "Workers Compensation"
+                            ]
+                        }
+                    },
+                    "collapsed": true,
+                    "title": "Coverage Desc",
+                    "datasource": {
+                        "fullname": "localhost/SDAO - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "address": "LocalHost",
+                        "database": "aSDAOIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "live": false,
+                        "title": "SDAO - Production - Financial - Jan 2025 0001"
+                    }
+                },
+                "instanceid": "0CCFB-19AD-0A",
+                "panel": "scope",
+                "handlers": []
+            }
+        ],
+        "m2mThresholdFlag": 0
+    },
+    "psData": {},
+    "viewState": {
+        "activeTab": "filters"
+    }
+},
+{
+    "_id": "69b15e5ba559159d632ea722",
+    "title": "Recovery Reserves",
+    "type": "pivot2",
+    "subtype": "pivot2",
+    "oid": "69a6b6496d795c0033a8a514",
+    "desc": null,
+    "source": null,
+    "owner": "69a5e866fcc331467474c64e",
+    "created": "2026-03-10T07:19:25.308Z",
+    "lastUpdated": "2026-03-11T13:13:54.493Z",
+    "datasource": {
+        "address": "LocalHost",
+        "title": "SDAO_AE_Financials_Elasticube_Model",
+        "id": "localhost_aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+        "database": "aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+        "fullname": "localhost/SDAO_AE_Financials_Elasticube_Model",
+        "live": false
+    },
+    "selection": null,
+    "metadata": {
+        "ignore": {
+            "dimensions": [],
+            "ids": [],
+            "all": false
+        },
+        "panels": [
+            {
+                "name": "rows",
+                "items": [
+                    {
+                        "jaql": {
+                            "table": "Event",
+                            "column": "Event Date",
+                            "dim": "[Event.Event Date (Calendar)]",
+                            "datatype": "datetime",
+                            "merged": true,
+                            "level": "years",
+                            "title": "Years in Event Date"
+                        },
+                        "instanceid": "F9E67-29B5-25",
+                        "field": {
+                            "id": "[Event.Event Date (Calendar)]_years",
+                            "index": 0
+                        },
+                        "format": {
+                            "mask": {
+                                "years": "yyyy",
+                                "quarters": "yyyy Q",
+                                "months": "MM/yyyy",
+                                "weeks": "ww yyyy",
+                                "days": "MM/dd/yyyy",
+                                "minutes": "HH:mm",
+                                "dateAndTime": "MM/dd/yyyy HH:mm"
+                            }
+                        },
+                        "panel": "rows",
+                        "hierarchies": [
+                            "calendar"
+                        ]
+                    },
+                    {
+                        "jaql": {
+                            "table": "Adjuster Details",
+                            "column": "Adjuster Full Name",
+                            "dim": "[Adjuster Details.Adjuster Full Name]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Adjuster Full Name"
+                        },
+                        "instanceid": "1A2B6-9420-17",
+                        "field": {
+                            "id": "[Adjuster Details.Adjuster Full Name]",
+                            "index": 1
+                        },
+                        "panel": "rows"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Claim Number",
+                            "dim": "[Claim.Claim Number]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Claim Number"
+                        },
+                        "instanceid": "C93C9-6516-F5",
+                        "field": {
+                            "id": "[Claim.Claim Number]",
+                            "index": 2
+                        },
+                        "panel": "rows"
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Coverage Desc",
+                            "dim": "[Claim.Coverage Desc]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Coverage Desc"
+                        },
+                        "instanceid": "1CE59-D7C4-05",
+                        "field": {
+                            "id": "[Claim.Coverage Desc]",
+                            "index": 3
+                        },
+                        "panel": "rows",
+                        "disabled": false
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Claim Status Code",
+                            "dim": "[Claim.Claim Status Code]",
+                            "datatype": "text",
+                            "merged": true,
+                            "title": "Claim Status Code"
+                        },
+                        "instanceid": "4F3D1-26FC-58",
+                        "field": {
+                            "id": "[Claim.Claim Status Code]",
+                            "index": 4
+                        },
+                        "panel": "rows",
+                        "disabled": false
+                    }
+                ]
+            },
+            {
+                "name": "values",
+                "items": [
+                    {
+                        "jaql": {
+                            "table": "Reserve Current",
+                            "column": "Paid Total",
+                            "dim": "[Reserve Current.Paid Total]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Paid Total"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "275EB-FA86-39",
+                        "field": {
+                            "id": "[Reserve Current.Paid Total]_sum",
+                            "index": 5
+                        },
+                        "panel": "measures",
+                        "disabled": false
+                    },
+                    {
+                        "jaql": {
+                            "table": "Financials - Claimants",
+                            "column": "Reserve Amount",
+                            "dim": "[Financials - Claimants.Reserve Amount]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Reserve Amount"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "989FB-6F76-63",
+                        "field": {
+                            "id": "[Financials - Claimants.Reserve Amount]_sum",
+                            "index": 6
+                        },
+                        "panel": "measures",
+                        "disabled": false
+                    },
+                    {
+                        "jaql": {
+                            "table": "Reserve Current",
+                            "column": "Collection Total",
+                            "dim": "[Reserve Current.Collection Total]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Collection Total"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "FDACA-9544-BE",
+                        "field": {
+                            "id": "[Reserve Current.Collection Total]_sum",
+                            "index": 7
+                        },
+                        "panel": "measures",
+                        "disabled": false
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim Supplemental",
+                            "column": "Recovery Reserve",
+                            "dim": "[Claim Supplemental.Recovery Reserve]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Recovery Reserve"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "3A4DE-57DC-2A",
+                        "field": {
+                            "id": "[Claim Supplemental.Recovery Reserve]_sum",
+                            "index": 8
+                        },
+                        "panel": "measures",
+                        "disabled": false
+                    },
+                    {
+                        "jaql": {
+                            "table": "Reserve Current",
+                            "column": "Incurred Amount",
+                            "dim": "[Reserve Current.Incurred Amount]",
+                            "datatype": "numeric",
+                            "agg": "sum",
+                            "title": "Total Incurred Amount"
+                        },
+                        "format": {
+                            "color": {
+                                "type": "color"
+                            },
+                            "mask": {
+                                "type": "number",
+                                "t": true,
+                                "b": true,
+                                "separated": true,
+                                "decimals": "auto",
+                                "isdefault": true
+                            }
+                        },
+                        "instanceid": "C463D-B2D8-9F",
+                        "panel": "measures",
+                        "field": {
+                            "id": "[Reserve Current.Incurred Amount]_sum",
+                            "index": 9
+                        },
+                        "disabled": false
+                    }
+                ]
+            },
+            {
+                "name": "columns",
+                "items": []
+            },
+            {
+                "name": "filters",
+                "items": [
+                    {
+                        "jaql": {
+                            "table": "Claim Supplemental",
+                            "column": "Recovery Reserve",
+                            "dim": "[Claim Supplemental.Recovery Reserve]",
+                            "datatype": "numeric",
+                            "collapsed": true,
+                            "title": "Recovery Reserve",
+                            "datasource": {
+                                "address": "LocalHost",
+                                "title": "SDAO_AE_Financials_Elasticube_Model",
+                                "id": "localhost_aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                                "database": "aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                                "fullname": "localhost/SDAO_AE_Financials_Elasticube_Model",
+                                "live": false
+                            },
+                            "filter": {
+                                "explicit": false,
+                                "multiSelection": true,
+                                "exclude": {
+                                    "members": [
+                                        "0",
+                                        "N\\A"
+                                    ]
+                                }
+                            }
+                        },
+                        "instanceid": "58DF3-FD0A-0B",
+                        "panel": "scope",
+                        "disabled": false
+                    },
+                    {
+                        "jaql": {
+                            "table": "Claim",
+                            "column": "Coverage Desc",
+                            "dim": "[Claim.Coverage Desc]",
+                            "datatype": "text",
+                            "merged": true,
+                            "collapsed": true,
+                            "title": "Coverage Desc",
+                            "datasource": {
+                                "address": "LocalHost",
+                                "title": "SDAO_AE_Financials_Elasticube_Model",
+                                "id": "localhost_aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                                "database": "aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                                "fullname": "localhost/SDAO_AE_Financials_Elasticube_Model",
+                                "live": false
+                            },
+                            "filter": {
+                                "explicit": false,
+                                "multiSelection": true,
+                                "exclude": {
+                                    "members": [
+                                        "N\\A",
+                                        "Workers Compensation"
+                                    ]
+                                }
+                            }
+                        },
+                        "instanceid": "0CCFB-19AD-0A",
+                        "panel": "scope",
+                        "disabled": false
+                    }
+                ]
+            }
+        ],
+        "usedFormulasMapping": {}
+    },
+    "style": {
+        "scroll": false,
+        "pageSize": 25,
+        "automaticHeight": true,
+        "colors": {
+            "rows": true,
+            "columns": false,
+            "headers": false,
+            "members": false,
+            "totals": false
+        },
+        "narration": {
+            "enabled": false,
+            "display": "above",
+            "format": "bullets",
+            "verbosity": "medium",
+            "up_sentiment": "good",
+            "aggregation": "sum",
+            "labels": [
+                {
+                    "id": "year",
+                    "title": "Year",
+                    "singular": "Year",
+                    "plural": "Year"
+                },
+                {
+                    "id": "adjuster_full_name",
+                    "title": "Adjuster Full Name",
+                    "singular": "Adjuster Full Name",
+                    "plural": "Adjuster Full Name"
+                },
+                {
+                    "id": "claim_number",
+                    "title": "Claim Number",
+                    "singular": "Claim Number",
+                    "plural": "Claim Number"
+                },
+                {
+                    "id": "coverage_desc",
+                    "title": "Coverage Desc",
+                    "singular": "Coverage Desc",
+                    "plural": "Coverage Desc"
+                },
+                {
+                    "id": "claim_status_code",
+                    "title": "Claim Status Code",
+                    "singular": "Claim Status Code",
+                    "plural": "Claim Status Code"
+                },
+                {
+                    "id": "recovery_reserve",
+                    "title": "Recovery Reserve",
+                    "singular": "Recovery Reserve",
+                    "plural": "Recovery Reserve"
+                }
+            ]
+        },
+        "jtdExcludedDims": [
+            "[Event.Event Date (Calendar)]",
+            "[Adjuster Details.Adjuster Full Name]",
+            "[Claim.Claim Number]",
+            "[Claim.Coverage Desc]",
+            "[Claim.Claim Status Code]",
+            "[Reserve Current.Paid Total]",
+            "[Financials - Claimants.Reserve Amount]",
+            "[Reserve Current.Collection Total]",
+            "[Claim Supplemental.Recovery Reserve]",
+            "[Reserve Current.Incurred Amount]"
+        ]
+    },
+    "instanceid": "E5BA0-625B-E3",
+    "headerHidden": false,
+    "drillToDashboardConfig": {
+        "drilledDashboardPrefix": "_drill",
+        "drilledDashboardsFolderPrefix": "",
+        "displayFilterPane": true,
+        "displayDashboardsPane": true,
+        "displayToolbarRow": true,
+        "displayHeaderRow": true,
+        "volatile": false,
+        "hideDrilledDashboards": true,
+        "hideSharedDashboardsForNonOwner": true,
+        "drillToDashboardRightMenuCaption": "Jump to ",
+        "drillToDashboardNavigateType": 2,
+        "drillToDashboardNavigateTypePivot": 2,
+        "drillToDashboardNavigateTypeCharts": 1,
+        "drillToDashboardNavigateTypeOthers": 3,
+        "excludeFilterDims": [],
+        "includeFilterDims": [],
+        "drilledDashboardDisplayType": 2,
+        "dashboardIds": [],
+        "modalWindowResize": false,
+        "modalWindowMeasurement": "%",
+        "showFolderNameOnMenuSelection": false,
+        "resetDashFiltersAfterJTD": false,
+        "sameCubeRestriction": true,
+        "showJTDIcon": true,
+        "sendPieChartMeasureFiltersOnClick": true,
+        "forceZeroInsteadNull": false,
+        "mergeTargetDashboardFilters": false,
+        "drillToDashboardByName": false,
+        "sendBreakByValueFilter": true,
+        "ignoreFiltersSource": false,
+        "sendFormulaFiltersDuplicate": "none"
+    },
+    "wasRendered": false,
+    "realTimeRefreshing": false,
+    "options": {
+        "dashboardFiltersMode": "filter",
+        "selector": false,
+        "triggersDomready": true,
+        "drillToAnywhere": true,
+        "autoUpdateOnEveryChange": true,
+        "interactivePivot": {
+            "enable": false
+        },
+        "availableExcludeDims": [
+            "[Event.Event Date (Calendar)]",
+            "[Adjuster Details.Adjuster Full Name]",
+            "[Claim.Claim Number]",
+            "[Claim.Coverage Desc]",
+            "[Claim.Claim Status Code]",
+            "[Reserve Current.Paid Total]",
+            "[Financials - Claimants.Reserve Amount]",
+            "[Reserve Current.Collection Total]",
+            "[Claim Supplemental.Recovery Reserve]",
+            "[Reserve Current.Incurred Amount]"
+        ],
+        "designPanelConfig": {
+            "shouldRender": false,
+            "selectedItem": -1
+        },
+        "imageColumns": []
+    },
+    "dashboardid": "69a6b6496d795c0033a8a513",
+    "query": {
+        "datasource": {
+            "address": "LocalHost",
+            "title": "SDAO_AE_Financials_Elasticube_Model",
+            "id": "localhost_aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+            "database": "aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+            "fullname": "localhost/SDAO_AE_Financials_Elasticube_Model",
+            "live": false
+        },
+        "format": "pivot",
+        "grandTotals": {
+            "title": "Grand Total"
+        },
+        "metadata": [
+            {
+                "jaql": {
+                    "table": "Event",
+                    "column": "Event Date",
+                    "dim": "[Event.Event Date (Calendar)]",
+                    "datatype": "datetime",
+                    "merged": true,
+                    "level": "years",
+                    "title": "Years in Event Date"
+                },
+                "instanceid": "F9E67-29B5-25",
+                "field": {
+                    "id": "[Event.Event Date (Calendar)]_years",
+                    "index": 0
+                },
+                "format": {
+                    "mask": {
+                        "years": "yyyy",
+                        "quarters": "yyyy Q",
+                        "months": "MM/yyyy",
+                        "weeks": "ww yyyy",
+                        "days": "MM/dd/yyyy",
+                        "minutes": "HH:mm",
+                        "dateAndTime": "MM/dd/yyyy HH:mm"
+                    }
+                },
+                "panel": "rows",
+                "hierarchies": [
+                    "calendar"
+                ],
+                "handlers": [
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Adjuster Details",
+                    "column": "Adjuster Full Name",
+                    "dim": "[Adjuster Details.Adjuster Full Name]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Adjuster Full Name"
+                },
+                "instanceid": "1A2B6-9420-17",
+                "field": {
+                    "id": "[Adjuster Details.Adjuster Full Name]",
+                    "index": 1
+                },
+                "panel": "rows",
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Claim Number",
+                    "dim": "[Claim.Claim Number]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Claim Number"
+                },
+                "instanceid": "C93C9-6516-F5",
+                "field": {
+                    "id": "[Claim.Claim Number]",
+                    "index": 2
+                },
+                "panel": "rows",
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Coverage Desc",
+                    "dim": "[Claim.Coverage Desc]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Coverage Desc"
+                },
+                "instanceid": "1CE59-D7C4-05",
+                "field": {
+                    "id": "[Claim.Coverage Desc]",
+                    "index": 3
+                },
+                "panel": "rows",
+                "disabled": false,
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Claim Status Code",
+                    "dim": "[Claim.Claim Status Code]",
+                    "datatype": "text",
+                    "merged": true,
+                    "title": "Claim Status Code"
+                },
+                "instanceid": "4F3D1-26FC-58",
+                "field": {
+                    "id": "[Claim.Claim Status Code]",
+                    "index": 4
+                },
+                "panel": "rows",
+                "disabled": false,
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Reserve Current",
+                    "column": "Paid Total",
+                    "dim": "[Reserve Current.Paid Total]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Paid Total"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "275EB-FA86-39",
+                "field": {
+                    "id": "[Reserve Current.Paid Total]_sum",
+                    "index": 5
+                },
+                "panel": "measures",
+                "disabled": false,
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Financials - Claimants",
+                    "column": "Reserve Amount",
+                    "dim": "[Financials - Claimants.Reserve Amount]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Reserve Amount"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "989FB-6F76-63",
+                "field": {
+                    "id": "[Financials - Claimants.Reserve Amount]_sum",
+                    "index": 6
+                },
+                "panel": "measures",
+                "disabled": false,
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Reserve Current",
+                    "column": "Collection Total",
+                    "dim": "[Reserve Current.Collection Total]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Collection Total"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "FDACA-9544-BE",
+                "field": {
+                    "id": "[Reserve Current.Collection Total]_sum",
+                    "index": 7
+                },
+                "panel": "measures",
+                "disabled": false,
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Claim Supplemental",
+                    "column": "Recovery Reserve",
+                    "dim": "[Claim Supplemental.Recovery Reserve]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Recovery Reserve"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "3A4DE-57DC-2A",
+                "field": {
+                    "id": "[Claim Supplemental.Recovery Reserve]_sum",
+                    "index": 8
+                },
+                "panel": "measures",
+                "disabled": false,
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Reserve Current",
+                    "column": "Incurred Amount",
+                    "dim": "[Reserve Current.Incurred Amount]",
+                    "datatype": "numeric",
+                    "agg": "sum",
+                    "title": "Total Incurred Amount"
+                },
+                "format": {
+                    "color": {
+                        "type": "color",
+                        "color": "transparent"
+                    },
+                    "mask": {
+                        "type": "number",
+                        "t": true,
+                        "b": true,
+                        "separated": true,
+                        "decimals": "auto",
+                        "isdefault": true
+                    }
+                },
+                "instanceid": "C463D-B2D8-9F",
+                "panel": "measures",
+                "field": {
+                    "id": "[Reserve Current.Incurred Amount]_sum",
+                    "index": 9
+                },
+                "disabled": false,
+                "handlers": [
+                    {},
+                    {}
+                ]
+            },
+            {
+                "jaql": {
+                    "table": "Claim Supplemental",
+                    "column": "Recovery Reserve",
+                    "dim": "[Claim Supplemental.Recovery Reserve]",
+                    "datatype": "numeric",
+                    "collapsed": true,
+                    "title": "Recovery Reserve",
+                    "datasource": {
+                        "address": "LocalHost",
+                        "title": "SDAO_AE_Financials_Elasticube_Model",
+                        "id": "localhost_aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                        "database": "aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                        "fullname": "localhost/SDAO_AE_Financials_Elasticube_Model",
+                        "live": false
+                    },
+                    "filter": {
+                        "explicit": false,
+                        "multiSelection": true,
+                        "exclude": {
+                            "members": [
+                                "0",
+                                "N\\A"
+                            ]
+                        }
+                    }
+                },
+                "instanceid": "58DF3-FD0A-0B",
+                "panel": "scope",
+                "disabled": false,
+                "handlers": []
+            },
+            {
+                "jaql": {
+                    "table": "Claim",
+                    "column": "Coverage Desc",
+                    "dim": "[Claim.Coverage Desc]",
+                    "datatype": "text",
+                    "merged": true,
+                    "collapsed": true,
+                    "title": "Coverage Desc",
+                    "datasource": {
+                        "address": "LocalHost",
+                        "title": "SDAO_AE_Financials_Elasticube_Model",
+                        "id": "localhost_aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                        "database": "aSDAOXwAaAEXwAaFinancialsXwAaElasticubeXwAaModel",
+                        "fullname": "localhost/SDAO_AE_Financials_Elasticube_Model",
+                        "live": false
+                    },
+                    "filter": {
+                        "explicit": false,
+                        "multiSelection": true,
+                        "exclude": {
+                            "members": [
+                                "N\\A",
+                                "Workers Compensation"
+                            ]
+                        }
+                    }
+                },
+                "instanceid": "0CCFB-19AD-0A",
+                "panel": "scope",
+                "disabled": false,
+                "handlers": []
+            }
+        ],
+        "m2mThresholdFlag": 0
+    },
+    "psData": {},
+    "viewState": {
+        "activeTab": "filters"
+    },
+    "waitingForUserTimezone": false,
+    "userId": "69a5e866fcc331467474c64e",
+    "instanceType": "owner"
+}
+
+
+

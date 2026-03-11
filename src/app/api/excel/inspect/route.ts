@@ -6,6 +6,7 @@ import {
   type WorkbookSummary,
   writeUploadedFileToTemp,
 } from '@/lib/excelAudit';
+import { isUploadedFile } from '@/lib/uploadedFile';
 
 export const runtime = 'nodejs';
 
@@ -30,12 +31,12 @@ export async function POST(request: Request) {
     const rightFile = formData.get('right');
     const rightWorkbookRaw = formData.get('rightWorkbook');
 
-    if (!(leftFile instanceof File)) {
+    if (!isUploadedFile(leftFile)) {
       return NextResponse.json({ error: 'Upload the SAP BI file.' }, { status: 400 });
     }
 
     leftPath = await writeUploadedFileToTemp(leftFile, 'excel-left');
-    if (rightFile instanceof File) {
+    if (isUploadedFile(rightFile)) {
       rightPath = await writeUploadedFileToTemp(rightFile, 'excel-right');
     }
 

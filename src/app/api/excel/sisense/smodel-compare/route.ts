@@ -5,6 +5,7 @@ import {
   runSmodelCompare,
   writeUploadedSmodelToTemp,
 } from '@/lib/smodelCompare';
+import { isUploadedFile } from '@/lib/uploadedFile';
 
 export const runtime = 'nodejs';
 
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     const leftFile = formData.get('left');
     const rightFile = formData.get('right');
 
-    if (!(leftFile instanceof File) || !(rightFile instanceof File)) {
+    if (!isUploadedFile(leftFile) || !isUploadedFile(rightFile)) {
       return NextResponse.json(
         { error: 'Upload both .smodel files using fields left and right.' },
         { status: 400 }
