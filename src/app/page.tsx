@@ -29,7 +29,7 @@ const PIPELINE_STEPS = [
 
 interface ActionCardProps {
   title: string;
-  highlight: string;
+  highlight?: string;
   highlightColor: string;
   desc: string;
   btnText: string;
@@ -119,8 +119,7 @@ export default function QaLandingPage() {
           />
 
           <ActionCard
-            title="Excel"
-            highlight="Audit"
+            title="Audit"
             highlightColor="text-sky-600"
             desc="Upload SAP BI and Sisense exports, map mismatched layouts, and compare row-level output."
             btnText="Compare Sheets"
@@ -178,8 +177,14 @@ function ActionCard({ title, highlight, highlightColor, desc, btnText, btnColor,
     >
       <div>
         <h2 className="text-xl font-black text-slate-900 mb-1 uppercase italic tracking-tight">
-          {title} <br />
-          <span className={highlightColor}>{highlight}</span>
+          {title}
+          {highlight ? (
+            <>
+              {' '}
+              <br />
+              <span className={highlightColor}>{highlight}</span>
+            </>
+          ) : null}
         </h2>
         <p className="text-[13px] text-slate-400 group-hover:text-slate-600 mb-6 transition-colors font-medium">{desc}</p>
       </div>

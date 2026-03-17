@@ -13,13 +13,14 @@ interface ApiResponse {
       totalUsers?: number;
       totalDashboards?: number;
       totalWidgets?: number;
-      tableWidgetAggCount?: number;
+      focusWidgetType?: string;
+      focusWidgetCount?: number;
     };
     widgetTypeBreakdown?: Array<{
       widgetType: string;
       count: number;
     }>;
-    tableWidgetAggDetails?: Array<{
+    focusWidgetDetails?: Array<{
       dashboardId: string;
       dashboardTitle: string;
       widgetId: string;
@@ -39,22 +40,68 @@ interface ApiResponse {
   error?: string;
 }
 
+const DEFAULT_WIDGET_TYPE_OPTIONS = [
+  'Unknown',
+  'pivot2',
+  'richtexteditor',
+  'chart/column',
+  'indicator',
+  'chart/pie',
+  'chart/line',
+  'chart/bar',
+  'tablewidget',
+  'tablewidgetagg',
+  'chart/area',
+  'ExportWidgetButton',
+  'heatmap',
+  'Parameters Widget',
+  'chart/funnel',
+  'Advanced Date Range Filter',
+  'WidgetsTabber',
+  'BloX',
+  'chart/polar',
+  'Advanced Filters Plugin',
+  'chart/scatter',
+  'map/scatter',
+  'map/area',
+  'treemap',
+  'chart/boxplot',
+  'sunburst',
+  'histogramwidget',
+  'iframewidget',
+  'trelliswidget',
+  'Widget Toolbar',
+  'Indicator Card',
+  'Viewer Dashboard 2',
+  'Expandable Pivot',
+  'Paldi Plugins',
+] as const;
+
 export default function SisenseUserDashboardInventory({ initialBaseUrl, initialToken }: Props) {
   const [baseUrl, setBaseUrl] = useState(initialBaseUrl);
   const [token, setToken] = useState(initialToken);
+  const [focusWidgetType, setFocusWidgetType] = useState('tablewidgetagg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [summary, setSummary] = useState({
     totalUsers: 0,
     totalDashboards: 0,
     totalWidgets: 0,
-    tableWidgetAggCount: 0,
+    focusWidgetType: 'tablewidgetagg',
+    focusWidgetCount: 0,
   });
   const [widgetTypeBreakdown, setWidgetTypeBreakdown] = useState<Array<{ widgetType: string; count: number }>>([]);
-  const [tableWidgetAggDetails, setTableWidgetAggDetails] = useState<
-    NonNullable<ApiResponse['data']>['tableWidgetAggDetails']
+  const [focusWidgetDetails, setFocusWidgetDetails] = useState<
+    NonNullable<ApiResponse['data']>['focusWidgetDetails']
   >([]);
-  const [expandTableWidgetAgg, setExpandTableWidgetAgg] = useState(false);
+  const [expandFocusWidgetDetails, setExpandFocusWidgetDetails] = useState(false);
+  const resolvedFocusWidgetType = focusWidgetType.trim() || 'tablewidgetagg';
+  const widgetTypeOptions = Array.from(
+    new Set([
+      ...DEFAULT_WIDGET_TYPE_OPTIONS,
+      ...widgetTypeBreakdown.map((row) => row.widgetType).filter(Boolean),
+    ])
+  );
   const displayWidgetType = (widgetType: string) =>
     widgetType.toLowerCase() === 'unknown'
       ? 'Unknown (paldi, text, not listed or native sisense widget)'
@@ -77,8 +124,8 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
     URL.revokeObjectURL(url);
   };
 
-  const exportTableWidgetAggCsv = () => {
-    if (!tableWidgetAggDetails || tableWidgetAggDetails.length === 0) return;
+  const exportFocusWidgetCsv = () => {
+    if (!focusWidgetDetails || focusWidgetDetails.length === 0) return;
 
     const headers = [
       'Dashboard ID',
@@ -98,7 +145,7 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
     ];
     const escapeCsv = (value: string | number | null | undefined) =>
       `"${String(value ?? '').replace(/"/g, '""')}"`;
-    const rows = tableWidgetAggDetails.map((row) => [
+    const rows = focusWidgetDetails.map((row) => [
       row.dashboardId,
       row.dashboardTitle,
       row.widgetId,
@@ -120,7 +167,7 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `tablewidgetagg-details-${Date.now()}.csv`;
+    link.download = `${summary.focusWidgetType || resolvedFocusWidgetType}-details-${Date.now()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -133,9 +180,15 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
 
     setLoading(true);
     setError('');
-    setSummary({ totalUsers: 0, totalDashboards: 0, totalWidgets: 0, tableWidgetAggCount: 0 });
+    setSummary({
+      totalUsers: 0,
+      totalDashboards: 0,
+      totalWidgets: 0,
+      focusWidgetType: resolvedFocusWidgetType,
+      focusWidgetCount: 0,
+    });
     setWidgetTypeBreakdown([]);
-    setTableWidgetAggDetails([]);
+    setFocusWidgetDetails([]);
 
     try {
       const response = await fetch('/api/excel/sisense/user-inventory', {
@@ -144,6 +197,7 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
         body: JSON.stringify({
           baseUrl: baseUrl.trim(),
           token: token.trim(),
+          focusWidgetType: resolvedFocusWidgetType,
         }),
       });
 
@@ -156,10 +210,11 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
         totalUsers: json.data?.summary?.totalUsers ?? 0,
         totalDashboards: json.data?.summary?.totalDashboards ?? 0,
         totalWidgets: json.data?.summary?.totalWidgets ?? 0,
-        tableWidgetAggCount: json.data?.summary?.tableWidgetAggCount ?? 0,
+        focusWidgetType: json.data?.summary?.focusWidgetType ?? resolvedFocusWidgetType,
+        focusWidgetCount: json.data?.summary?.focusWidgetCount ?? 0,
       });
       setWidgetTypeBreakdown(json.data?.widgetTypeBreakdown ?? []);
-      setTableWidgetAggDetails(json.data?.tableWidgetAggDetails ?? []);
+      setFocusWidgetDetails(json.data?.focusWidgetDetails ?? []);
     } catch (requestError) {
       const message = requestError instanceof Error ? requestError.message : 'Request failed';
       setError(message);
@@ -170,7 +225,21 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
 
   return (
     <section className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-4">
+        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-700">Widget Inventory</p>
+        <h2 className="mt-1 text-xl font-black tracking-tight text-slate-900">Sisense widget inventory and audit</h2>
+        <p className="mt-2 max-w-4xl text-sm text-slate-600">
+          This tool connects to the Sisense environment with the URL and token you provide, loads the full admin dashboard inventory, reads widget metadata for each dashboard widget, and combines that with user records from the environment. From that scan, it calculates total users, total dashboards, total widgets, and a full widget type distribution across the environment.
+        </p>
+        <p className="mt-2 max-w-4xl text-sm text-slate-600">
+          After the full scan is complete, the widget type field lets you focus on one specific widget type such as <code>tablewidgetagg</code>, <code>pivot2</code>, or any custom type you enter. The detail table then shows matching widgets only, including dashboard name, widget name, widget type, owner, tenant, and datasource information.
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          Outputs on this screen: environment totals, widget type breakdown, and an exportable CSV for the selected widget type details.
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
         <input
           value={baseUrl}
           onChange={(event) => setBaseUrl(event.target.value)}
@@ -183,6 +252,20 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
           placeholder="Bearer token or raw token"
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
         />
+        <input
+          value={focusWidgetType}
+          onChange={(event) => setFocusWidgetType(event.target.value)}
+          list="widget-type-options"
+          placeholder="Choose or type widget type, e.g. tablewidgetagg"
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+        />
+        <datalist id="widget-type-options">
+          {widgetTypeOptions.map((widgetType) => (
+            <option key={widgetType} value={widgetType}>
+              {displayWidgetType(widgetType)}
+            </option>
+          ))}
+        </datalist>
       </div>
 
       <div className="mt-4 flex items-center gap-2">
@@ -210,7 +293,7 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
         <SummaryCard label="Total Users" value={summary.totalUsers} />
         <SummaryCard label="Total Dashboards" value={summary.totalDashboards} />
         <SummaryCard label="Total Widgets" value={summary.totalWidgets} />
-        <SummaryCard label="TableWidgetAgg" value={summary.tableWidgetAggCount} />
+        <SummaryCard label={displayWidgetType(summary.focusWidgetType)} value={summary.focusWidgetCount} />
       </div>
 
       <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
@@ -262,28 +345,30 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
       <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">TableWidgetAgg Details</h3>
-            <p className="mt-0.5 text-xs text-slate-500">Owner, tenant, and datasource details for `tablewidgetagg` widgets.</p>
+            <h3 className="text-sm font-bold text-slate-900">{displayWidgetType(summary.focusWidgetType)} Details</h3>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Owner, tenant, and datasource details for <code>{summary.focusWidgetType}</code> widgets.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={exportTableWidgetAggCsv}
-              disabled={!tableWidgetAggDetails || tableWidgetAggDetails.length === 0}
+              onClick={exportFocusWidgetCsv}
+              disabled={!focusWidgetDetails || focusWidgetDetails.length === 0}
               className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 disabled:opacity-60"
             >
               Export CSV
             </button>
             <button
               type="button"
-              onClick={() => setExpandTableWidgetAgg((current) => !current)}
+              onClick={() => setExpandFocusWidgetDetails((current) => !current)}
               className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700"
             >
-              {expandTableWidgetAgg ? 'Collapse' : 'Expand'}
+              {expandFocusWidgetDetails ? 'Collapse' : 'Expand'}
             </button>
           </div>
         </div>
-        <div className={`${expandTableWidgetAgg ? 'max-h-[760px]' : 'max-h-[360px]'} overflow-auto`}>
+        <div className={`${expandFocusWidgetDetails ? 'max-h-[760px]' : 'max-h-[360px]'} overflow-auto`}>
           <table className="min-w-full text-left text-sm">
             <thead className="sticky top-0 bg-slate-100 text-slate-700">
               <tr>
@@ -296,14 +381,14 @@ export default function SisenseUserDashboardInventory({ initialBaseUrl, initialT
               </tr>
             </thead>
             <tbody>
-              {tableWidgetAggDetails.length === 0 ? (
+              {focusWidgetDetails.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
-                    No `tablewidgetagg` widgets found in this run.
+                    No <code>{summary.focusWidgetType}</code> widgets found in this run.
                   </td>
                 </tr>
               ) : (
-                tableWidgetAggDetails.map((row, index) => (
+                focusWidgetDetails.map((row, index) => (
                   <tr
                     key={`${row.dashboardId}:${row.widgetId}:${index}`}
                     className={`border-t border-slate-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}

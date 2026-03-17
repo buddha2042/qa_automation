@@ -10,6 +10,7 @@ interface RequestBody {
   username?: string;
   password?: string;
   maxWidgets?: number;
+  focusWidgetType?: string;
 }
 
 interface RawDashboard {
@@ -69,7 +70,7 @@ interface OutputDashboard {
   widgets: OutputWidget[];
 }
 
-interface TableWidgetAggDetail {
+interface FocusWidgetDetail {
   dashboardId: string;
   dashboardTitle: string;
   widgetId: string;
@@ -140,6 +141,11 @@ const parseWidget = (payload: unknown): RawWidget | null => {
   return obj as RawWidget;
 };
 
+const normalizeWidgetType = (value: string | null | undefined): string =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase();
+
 const extractDashboardWidgetIds = (dashboard: RawDashboard): string[] => {
   const ids = new Set<string>();
 
@@ -188,6 +194,8 @@ export async function POST(request: Request) {
 
     const baseUrl = normalizeBaseUrl(body.baseUrl);
     const token = await resolveSisenseBearer(baseUrl, { token: body.token });
+    const focusWidgetType = String(body.focusWidgetType ?? 'tablewidgetagg').trim() || 'tablewidgetagg';
+    const normalizedFocusWidgetType = normalizeWidgetType(focusWidgetType);
 
     const [usersResponse, adminResponse] = await Promise.all([
       fetch(`${baseUrl}/api/v1/users`, {
@@ -335,7 +343,7 @@ export async function POST(request: Request) {
     let returnedWidgetRefs = 0;
     let truncated = false;
     const widgetTypeCounts = new Map<string, number>();
-    const tableWidgetAggDetails: TableWidgetAggDetail[] = [];
+    const focusWidgetDetails: FocusWidgetDetail[] = [];
 
     const output: OutputDashboard[] = [];
 
@@ -356,10 +364,10 @@ export async function POST(request: Request) {
         widgetTypeCounts.set(widgetTypeKey, (widgetTypeCounts.get(widgetTypeKey) ?? 0) + 1);
         if (nextWidget.widgetType) resolvedWidgetTypes += 1;
 
-        if ((nextWidget.widgetType ?? '').toLowerCase() === 'tablewidgetagg') {
+        if (normalizeWidgetType(nextWidget.widgetType) === normalizedFocusWidgetType) {
           const ownerId = resolved?.ownerId ?? resolved?.userId ?? null;
           const ownerInfo = ownerId ? usersById.get(ownerId) : undefined;
-          tableWidgetAggDetails.push({
+          focusWidgetDetails.push({
             dashboardId: dashboard.dashboardId,
             dashboardTitle: dashboard.title,
             widgetId: nextWidget.widgetId,
@@ -411,10 +419,11 @@ export async function POST(request: Request) {
           resolvedWidgetTypes,
           dashboardWidgetCalls,
           dashboardWidgetCallErrors,
-          tableWidgetAggCount: tableWidgetAggDetails.length,
+          focusWidgetType,
+          focusWidgetCount: focusWidgetDetails.length,
         },
         widgetTypeBreakdown,
-        tableWidgetAggDetails,
+        focusWidgetDetails,
         dashboards: output,
       },
     });

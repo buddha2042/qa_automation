@@ -741,7 +741,7 @@ export default function ExcelAuditPage() {
               onClick={() => setActiveTab('excel')}
               className={`rounded-xl px-4 py-2 ${activeTab === 'excel' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
             >
-              Excel Compare
+              File Compare
             </button>
             <button
               type="button"
@@ -755,7 +755,7 @@ export default function ExcelAuditPage() {
               onClick={() => setActiveTab('admin-inspector')}
               className={`rounded-xl px-4 py-2 ${activeTab === 'admin-inspector' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
             >
-              Admin Inspector
+              Widget Inventory
             </button>
           </div>
         </section>
