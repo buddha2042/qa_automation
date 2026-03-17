@@ -302,7 +302,7 @@ const buildSmodelRowsFromPythonMetadata = (
   return buildSmodelCompareRows(leftRows, rightRows);
 };
 
-export default function ExcelAuditPage() {
+export default function AuditPage() {
   const [activeTab, setActiveTab] = useState<'excel' | 'smodel' | 'widget-inventory' | 'function-inventory'>('excel');
   const [leftFile, setLeftFile] = useState<File | null>(null);
   const [rightFile, setRightFile] = useState<File | null>(null);
@@ -729,7 +729,7 @@ export default function ExcelAuditPage() {
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] text-slate-900">
       <AppHeader
         title="Audit"
-        subtitle="Compare a file export with another vendor or connected platform source, even when layouts do not match."
+        subtitle="Audit files, models, widgets, and function usage across connected platform sources."
         backHref="/"
       />
 
