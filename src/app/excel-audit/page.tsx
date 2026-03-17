@@ -303,7 +303,7 @@ const buildSmodelRowsFromPythonMetadata = (
 };
 
 export default function ExcelAuditPage() {
-  const [activeTab, setActiveTab] = useState<'excel' | 'smodel' | 'admin-inspector'>('excel');
+  const [activeTab, setActiveTab] = useState<'excel' | 'smodel' | 'widget-inventory' | 'function-inventory'>('excel');
   const [leftFile, setLeftFile] = useState<File | null>(null);
   const [rightFile, setRightFile] = useState<File | null>(null);
   const [rightSourceMode, setRightSourceMode] = useState<'upload' | 'sisense'>('upload');
@@ -752,10 +752,17 @@ export default function ExcelAuditPage() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab('admin-inspector')}
-              className={`rounded-xl px-4 py-2 ${activeTab === 'admin-inspector' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+              onClick={() => setActiveTab('widget-inventory')}
+              className={`rounded-xl px-4 py-2 ${activeTab === 'widget-inventory' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
             >
               Widget Inventory
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('function-inventory')}
+              className={`rounded-xl px-4 py-2 ${activeTab === 'function-inventory' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+            >
+              Function Lookup
             </button>
           </div>
         </section>
@@ -1375,10 +1382,17 @@ export default function ExcelAuditPage() {
               </div>
             ) : null}
           </section>
+        ) : activeTab === 'widget-inventory' ? (
+          <SisenseUserDashboardInventory
+            initialBaseUrl={masterInspectorConfig.baseUrl}
+            initialToken={masterInspectorConfig.token}
+            mode="widget"
+          />
         ) : (
           <SisenseUserDashboardInventory
             initialBaseUrl={masterInspectorConfig.baseUrl}
             initialToken={masterInspectorConfig.token}
+            mode="function"
           />
         )}
       </main>

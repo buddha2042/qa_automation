@@ -121,11 +121,11 @@ export default function QaLandingPage() {
           <ActionCard
             title="Audit"
             highlightColor="text-sky-600"
-            desc="Upload SAP BI and Sisense exports, map mismatched layouts, and compare row-level output."
-            btnText="Compare Sheets"
+            desc="Open the audit workspace for file compare, model compare, widget inventory, and function lookup."
+            btnText="Open Audit"
             btnColor="bg-sky-600 shadow-sky-200 hover:bg-sky-700"
             hoverBorder="hover:border-sky-500 hover:shadow-sky-100"
-            onClick={() => router.push('/excel-audit')}
+            onClick={() => router.push('/audit')}
           />
         </div>
 

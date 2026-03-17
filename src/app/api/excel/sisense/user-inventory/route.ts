@@ -11,6 +11,7 @@ interface RequestBody {
   password?: string;
   maxWidgets?: number;
   focusWidgetType?: string;
+  focusFunction?: string;
 }
 
 interface RawDashboard {
@@ -87,9 +88,32 @@ interface FocusWidgetDetail {
   datasourceAddress: string | null;
 }
 
+interface FunctionMatch {
+  path: string;
+  snippet: string;
+}
+
+interface FocusFunctionDetail {
+  dashboardId: string;
+  dashboardTitle: string;
+  widgetId: string;
+  widgetName: string;
+  widgetType: string;
+  widgetSubType: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  ownerEmail: string | null;
+  tenantId: string | null;
+  datasourceTitle: string | null;
+  datasourceDatabase: string | null;
+  datasourceAddress: string | null;
+  matches: FunctionMatch[];
+}
+
 const MAX_WIDGETS_DEFAULT = 5000;
 const MAX_WIDGETS_HARD = 50000;
 const WIDGET_ENDPOINT_CONCURRENCY = 10;
+const FUNCTION_MATCH_PREVIEW_LIMIT = 12;
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -146,6 +170,51 @@ const normalizeWidgetType = (value: string | null | undefined): string =>
     .trim()
     .toLowerCase();
 
+const truncateSnippet = (value: string, maxLength = 180): string => {
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (compact.length <= maxLength) return compact;
+  return `${compact.slice(0, maxLength - 3)}...`;
+};
+
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const findFunctionMatches = (
+  value: unknown,
+  target: string,
+  path = '$',
+  acc: FunctionMatch[] = []
+): FunctionMatch[] => {
+  if (!target) return acc;
+
+  if (typeof value === 'string') {
+    const lowered = value.toLowerCase();
+    const normalizedTarget = target.toLowerCase();
+    const directMatch = lowered.includes(normalizedTarget);
+    const functionPattern = new RegExp(`\\b${escapeRegExp(normalizedTarget)}\\s*\\(`, 'i');
+    if (directMatch || functionPattern.test(value)) {
+      acc.push({
+        path,
+        snippet: truncateSnippet(value),
+      });
+    }
+    return acc;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => findFunctionMatches(item, target, `${path}[${index}]`, acc));
+    return acc;
+  }
+
+  const obj = asRecord(value);
+  if (!obj) return acc;
+
+  Object.entries(obj).forEach(([key, nested]) => {
+    findFunctionMatches(nested, target, `${path}.${key}`, acc);
+  });
+
+  return acc;
+};
+
 const extractDashboardWidgetIds = (dashboard: RawDashboard): string[] => {
   const ids = new Set<string>();
 
@@ -195,6 +264,7 @@ export async function POST(request: Request) {
     const baseUrl = normalizeBaseUrl(body.baseUrl);
     const token = await resolveSisenseBearer(baseUrl, { token: body.token });
     const focusWidgetType = String(body.focusWidgetType ?? 'tablewidgetagg').trim() || 'tablewidgetagg';
+    const focusFunction = String(body.focusFunction ?? '').trim();
     const normalizedFocusWidgetType = normalizeWidgetType(focusWidgetType);
 
     const [usersResponse, adminResponse] = await Promise.all([
@@ -283,6 +353,7 @@ export async function POST(request: Request) {
       datasourceFullname: string | null;
       datasourceDatabase: string | null;
       datasourceAddress: string | null;
+      rawPayload: unknown;
     }>();
     let dashboardWidgetCalls = 0;
     let dashboardWidgetCallErrors = 0;
@@ -328,6 +399,7 @@ export async function POST(request: Request) {
               datasourceFullname: String(detail.datasource?.fullname ?? '').trim() || null,
               datasourceDatabase: String(detail.datasource?.database ?? '').trim() || null,
               datasourceAddress: String(detail.datasource?.address ?? '').trim() || null,
+              rawPayload: payload,
             });
           } catch {
             dashboardWidgetCallErrors += 1;
@@ -344,6 +416,7 @@ export async function POST(request: Request) {
     let truncated = false;
     const widgetTypeCounts = new Map<string, number>();
     const focusWidgetDetails: FocusWidgetDetail[] = [];
+    const focusFunctionDetails: FocusFunctionDetail[] = [];
 
     const output: OutputDashboard[] = [];
 
@@ -385,6 +458,30 @@ export async function POST(request: Request) {
           });
         }
 
+        if (focusFunction && resolved?.rawPayload !== undefined) {
+          const functionMatches = findFunctionMatches(resolved.rawPayload, focusFunction).slice(0, FUNCTION_MATCH_PREVIEW_LIMIT);
+          if (functionMatches.length > 0) {
+            const ownerId = resolved.ownerId ?? resolved.userId ?? null;
+            const ownerInfo = ownerId ? usersById.get(ownerId) : undefined;
+            focusFunctionDetails.push({
+              dashboardId: dashboard.dashboardId,
+              dashboardTitle: dashboard.title,
+              widgetId: nextWidget.widgetId,
+              widgetName: nextWidget.widgetName,
+              widgetType: nextWidget.widgetType ?? 'Unknown',
+              widgetSubType: nextWidget.widgetSubType,
+              ownerId,
+              ownerName: ownerInfo?.ownerName ?? null,
+              ownerEmail: ownerInfo?.ownerEmail ?? null,
+              tenantId: ownerInfo?.tenantId ?? null,
+              datasourceTitle: resolved.datasourceTitle ?? null,
+              datasourceDatabase: resolved.datasourceDatabase ?? null,
+              datasourceAddress: resolved.datasourceAddress ?? null,
+              matches: functionMatches,
+            });
+          }
+        }
+
         if (returnedWidgetRefs >= maxWidgets) {
           truncated = true;
           continue;
@@ -421,9 +518,12 @@ export async function POST(request: Request) {
           dashboardWidgetCallErrors,
           focusWidgetType,
           focusWidgetCount: focusWidgetDetails.length,
+          focusFunction,
+          focusFunctionCount: focusFunctionDetails.length,
         },
         widgetTypeBreakdown,
         focusWidgetDetails,
+        focusFunctionDetails,
         dashboards: output,
       },
     });
