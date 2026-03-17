@@ -120,6 +120,7 @@ export default function QaLandingPage() {
 
           <ActionCard
             title="Audit"
+            highlight="Workspace"
             highlightColor="text-sky-600"
             desc="Open the audit workspace for file compare, model compare, widget inventory, and function lookup."
             btnText="Open Audit"
