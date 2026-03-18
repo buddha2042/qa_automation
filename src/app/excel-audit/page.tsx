@@ -49,6 +49,42 @@ interface PythonSmodelMetadataRow {
   table_importQuery?: string | null;
 }
 
+interface PythonSmodelColumnSummaryRow {
+  database?: string | null;
+  dataset_id?: string | null;
+  schemaName?: string | null;
+  table_id?: string | null;
+  table_name?: string | null;
+  [key: string]: unknown;
+}
+
+interface PythonSmodelJoinSummaryRow {
+  database?: string | null;
+  dataset_id?: string | null;
+  schemaName?: string | null;
+  table_id?: string | null;
+  table_name?: string | null;
+  [key: string]: unknown;
+}
+
+interface PythonSmodelQueryDiffRow {
+  database?: string | null;
+  dataset_id?: string | null;
+  schemaName?: string | null;
+  table_id?: string | null;
+  table_name?: string | null;
+  is_different?: boolean | string | null;
+}
+
+interface PythonSmodelColumnAttrDiffRow {
+  database?: string | null;
+  dataset_id?: string | null;
+  schemaName?: string | null;
+  table_id?: string | null;
+  table_name?: string | null;
+  [key: string]: unknown;
+}
+
 interface SmodelColumnRow {
   key: string;
   datasetId: string;
@@ -100,8 +136,27 @@ interface SmodelCompareRow {
   rightTableImportQuery: string;
   leftTableQuery: string;
   rightTableQuery: string;
+  extraColumnsInModelA: number;
+  extraColumnsInModelB: number;
+  joinCountModelA: number;
+  joinCountModelB: number;
+  joinCountDiff: number;
+  tableQueryDiff: boolean;
+  customTableDiff: boolean;
+  hiddenDiffCount: number;
+  datatypeDiffCount: number;
   mismatchFields: string[];
   status: 'MATCH' | 'MISMATCH';
+}
+
+interface PythonSmodelSheets {
+  METADATA?: PythonSmodelMetadataRow[];
+  COLUMN_SUMMARY?: PythonSmodelColumnSummaryRow[];
+  JOIN_SUMMARY?: PythonSmodelJoinSummaryRow[];
+  TABLE_QUERIES?: PythonSmodelQueryDiffRow[];
+  CUSTOM_TABLES?: PythonSmodelQueryDiffRow[];
+  HIDDEN_COLUMNS?: PythonSmodelColumnAttrDiffRow[];
+  DATATYPES?: PythonSmodelColumnAttrDiffRow[];
 }
 
 const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -180,7 +235,166 @@ const toSmodelText = (value: unknown): string => {
   }
 };
 
-const buildSmodelCompareRows = (leftRows: SmodelColumnRow[], rightRows: SmodelColumnRow[]): SmodelCompareRow[] => {
+const normalizeSmodelKeyPart = (value: unknown): string =>
+  toSmodelText(value)
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const escapeXml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const stripFileExtension = (value: string) => value.replace(/\.[^/.]+$/, '');
+
+const toDownloadSafeName = (value: string) =>
+  stripFileExtension(value)
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80) || 'model';
+
+const buildSmodelTableLookupKey = (parts: {
+  tableName?: unknown;
+  tableId?: unknown;
+  schemaName?: unknown;
+  datasetId?: unknown;
+}) =>
+  [
+    normalizeSmodelKeyPart(parts.datasetId),
+    normalizeSmodelKeyPart(parts.schemaName),
+    normalizeSmodelKeyPart(parts.tableName || parts.tableId),
+  ].join('|');
+
+const getNumberField = (row: Record<string, unknown>, fieldName: string) => {
+  const value = row[fieldName];
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(toSmodelText(value));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const getBooleanField = (value: unknown) => {
+  if (typeof value === 'boolean') return value;
+  const text = normalizeSmodelKeyPart(value);
+  return text === 'true' || text === '1' || text === 'yes';
+};
+
+interface SmodelTableSummary {
+  extraColumnsInModelA: number;
+  extraColumnsInModelB: number;
+  joinCountModelA: number;
+  joinCountModelB: number;
+  joinCountDiff: number;
+  tableQueryDiff: boolean;
+  customTableDiff: boolean;
+  hiddenDiffCount: number;
+  datatypeDiffCount: number;
+}
+
+const buildSmodelTableSummaries = (
+  sheets: PythonSmodelSheets,
+  modelALabel: string,
+  modelBLabel: string
+) => {
+  const summaries = new Map<string, SmodelTableSummary>();
+  const getSummary = (key: string) => {
+    const existing = summaries.get(key);
+    if (existing) return existing;
+    const created: SmodelTableSummary = {
+      extraColumnsInModelA: 0,
+      extraColumnsInModelB: 0,
+      joinCountModelA: 0,
+      joinCountModelB: 0,
+      joinCountDiff: 0,
+      tableQueryDiff: false,
+      customTableDiff: false,
+      hiddenDiffCount: 0,
+      datatypeDiffCount: 0,
+    };
+    summaries.set(key, created);
+    return created;
+  };
+
+  for (const row of sheets.COLUMN_SUMMARY ?? []) {
+    const key = buildSmodelTableLookupKey({
+      datasetId: row.dataset_id,
+      schemaName: row.schemaName,
+      tableName: row.table_name,
+      tableId: row.table_id,
+    });
+    const summary = getSummary(key);
+    summary.extraColumnsInModelA = getNumberField(row as Record<string, unknown>, `unique_cols_in_${modelALabel}`);
+    summary.extraColumnsInModelB = getNumberField(row as Record<string, unknown>, `unique_cols_in_${modelBLabel}`);
+  }
+
+  for (const row of sheets.JOIN_SUMMARY ?? []) {
+    const key = buildSmodelTableLookupKey({
+      datasetId: row.dataset_id,
+      schemaName: row.schemaName,
+      tableName: row.table_name,
+      tableId: row.table_id,
+    });
+    const summary = getSummary(key);
+    summary.joinCountModelA = getNumberField(row as Record<string, unknown>, modelALabel);
+    summary.joinCountModelB = getNumberField(row as Record<string, unknown>, modelBLabel);
+    summary.joinCountDiff = getNumberField(row as Record<string, unknown>, `diff_${modelBLabel}_minus_${modelALabel}`);
+  }
+
+  for (const row of sheets.TABLE_QUERIES ?? []) {
+    const key = buildSmodelTableLookupKey({
+      datasetId: row.dataset_id,
+      schemaName: row.schemaName,
+      tableName: row.table_name,
+      tableId: row.table_id,
+    });
+    getSummary(key).tableQueryDiff = getBooleanField(row.is_different);
+  }
+
+  for (const row of sheets.CUSTOM_TABLES ?? []) {
+    const key = buildSmodelTableLookupKey({
+      datasetId: row.dataset_id,
+      schemaName: row.schemaName,
+      tableName: row.table_name,
+      tableId: row.table_id,
+    });
+    getSummary(key).customTableDiff = getBooleanField(row.is_different);
+  }
+
+  for (const row of sheets.HIDDEN_COLUMNS ?? []) {
+    const key = buildSmodelTableLookupKey({
+      datasetId: row.dataset_id,
+      schemaName: row.schemaName,
+      tableName: row.table_name,
+      tableId: row.table_id,
+    });
+    const summary = getSummary(key);
+    const diffField = Object.keys(row).find((field) => field.startsWith('diff_count_in_'));
+    summary.hiddenDiffCount = diffField ? getNumberField(row as Record<string, unknown>, diffField) : 0;
+  }
+
+  for (const row of sheets.DATATYPES ?? []) {
+    const key = buildSmodelTableLookupKey({
+      datasetId: row.dataset_id,
+      schemaName: row.schemaName,
+      tableName: row.table_name,
+      tableId: row.table_id,
+    });
+    const summary = getSummary(key);
+    const diffField = Object.keys(row).find((field) => field.startsWith('diff_count_in_'));
+    summary.datatypeDiffCount = diffField ? getNumberField(row as Record<string, unknown>, diffField) : 0;
+  }
+
+  return summaries;
+};
+
+const buildSmodelCompareRows = (
+  leftRows: SmodelColumnRow[],
+  rightRows: SmodelColumnRow[],
+  tableSummaries: Map<string, SmodelTableSummary>
+): SmodelCompareRow[] => {
   const leftMap = new Map(leftRows.map((row) => [row.key, row]));
   const rightMap = new Map(rightRows.map((row) => [row.key, row]));
   const allKeys = Array.from(new Set([...leftMap.keys(), ...rightMap.keys()])).sort();
@@ -188,6 +402,13 @@ const buildSmodelCompareRows = (leftRows: SmodelColumnRow[], rightRows: SmodelCo
   return allKeys.map((key) => {
     const left = leftMap.get(key);
     const right = rightMap.get(key);
+    const tableSummaryKey = buildSmodelTableLookupKey({
+      datasetId: left?.datasetId || right?.datasetId || '',
+      schemaName: left?.schemaName || right?.schemaName || '',
+      tableName: left?.tableName || right?.tableName || '',
+      tableId: left?.tableId || right?.tableId || '',
+    });
+    const tableSummary = tableSummaries.get(tableSummaryKey);
     const leftTableType = left?.tableType ?? '';
     const rightTableType = right?.tableType ?? '';
     const leftTableExpression = left?.tableExpression ?? '';
@@ -251,6 +472,15 @@ const buildSmodelCompareRows = (leftRows: SmodelColumnRow[], rightRows: SmodelCo
       rightTableImportQuery,
       leftTableQuery,
       rightTableQuery,
+      extraColumnsInModelA: tableSummary?.extraColumnsInModelA ?? 0,
+      extraColumnsInModelB: tableSummary?.extraColumnsInModelB ?? 0,
+      joinCountModelA: tableSummary?.joinCountModelA ?? 0,
+      joinCountModelB: tableSummary?.joinCountModelB ?? 0,
+      joinCountDiff: tableSummary?.joinCountDiff ?? 0,
+      tableQueryDiff: tableSummary?.tableQueryDiff ?? false,
+      customTableDiff: tableSummary?.customTableDiff ?? false,
+      hiddenDiffCount: tableSummary?.hiddenDiffCount ?? 0,
+      datatypeDiffCount: tableSummary?.datatypeDiffCount ?? 0,
       mismatchFields,
       status,
     };
@@ -258,30 +488,41 @@ const buildSmodelCompareRows = (leftRows: SmodelColumnRow[], rightRows: SmodelCo
 };
 
 const buildSmodelRowsFromPythonMetadata = (
-  metadataRows: PythonSmodelMetadataRow[],
+  sheets: PythonSmodelSheets,
   leftLabel: string,
-  rightLabel: string
+  rightLabel: string,
+  modelAName: string,
+  modelBName: string
 ): SmodelCompareRow[] => {
+  const metadataRows = sheets.METADATA ?? [];
+  const tableSummaries = buildSmodelTableSummaries(sheets, modelAName, modelBName);
   const normalize = (value: unknown) => toSmodelText(value);
   const toComparable = (row: PythonSmodelMetadataRow): SmodelColumnRow => {
-    const database = normalize(row.database);
+    const datasetName = normalize(row.dataset_name);
     const datasetId = normalize(row.dataset_id);
     const schemaName = normalize(row.schemaName);
+    const tableName = normalize(row.table_name);
     const tableId = normalize(row.table_id);
+    const columnName = normalize(row.column_name);
     const columnId = normalize(row.column_id);
     const tableExpression = normalize(row.table_expression);
     const tableImportQuery = normalize(row.table_importQuery);
+    const logicalTableKey = normalizeSmodelKeyPart(tableName || tableId);
+    const logicalColumnKey = normalizeSmodelKeyPart(columnName || columnId);
     return {
-      key: `${database}|${datasetId}|${schemaName}|${tableId}|${columnId}`,
+      key: [
+        logicalTableKey,
+        logicalColumnKey,
+      ].join('|'),
       datasetId,
-      datasetName: normalize(row.dataset_name),
+      datasetName,
       schemaName,
       tableId,
-      tableName: normalize(row.table_name),
+      tableName,
       tableType: normalize(row.table_type),
       tableExpression,
       columnId,
-      columnName: normalize(row.column_name),
+      columnName,
       displayName: normalize(row.displayName),
       description: normalize(row.description),
       dataType: normalize(row.dataType),
@@ -299,7 +540,7 @@ const buildSmodelRowsFromPythonMetadata = (
   const rightRows = metadataRows
     .filter((row) => normalize(row.source_file) === rightLabel)
     .map(toComparable);
-  return buildSmodelCompareRows(leftRows, rightRows);
+  return buildSmodelCompareRows(leftRows, rightRows, tableSummaries);
 };
 
 export default function AuditPage() {
@@ -333,6 +574,8 @@ export default function AuditPage() {
   const [smodelSuccess, setSmodelSuccess] = useState('');
   const [smodelRows, setSmodelRows] = useState<SmodelCompareRow[]>([]);
   const [smodelFilter, setSmodelFilter] = useState<'mismatch' | 'match' | 'all'>('all');
+  const [smodelModelALabel, setSmodelModelALabel] = useState('Model A');
+  const [smodelModelBLabel, setSmodelModelBLabel] = useState('Model B');
   const [expandedTables, setExpandedTables] = useState({
     left: false,
     right: false,
@@ -362,6 +605,119 @@ export default function AuditPage() {
     smodelFilter === 'all' ? true : smodelFilter === 'match' ? row.status === 'MATCH' : row.status !== 'MATCH'
   );
   const smodelMismatchCount = smodelRows.filter((row) => row.status === 'MISMATCH').length;
+  const smodelMatchedCount = smodelRows.filter((row) => row.status === 'MATCH').length;
+
+  const exportSmodelComparisonWorkbook = () => {
+    const headers = [
+      'Status',
+      'Table',
+      'Column',
+      'Mismatch Fields',
+      'Extra Cols A',
+      'Extra Cols B',
+      'Join Count A',
+      'Join Count B',
+      'Join Diff',
+      'Table Query Diff',
+      'Custom Table Diff',
+      'Hidden Diff Count',
+      'Datatype Diff Count',
+      'Dataset ID',
+      'Dataset',
+      'Schema',
+      'Table ID',
+      `${smodelModelALabel} Table Type`,
+      `${smodelModelBLabel} Table Type`,
+      `${smodelModelALabel} Table Expression`,
+      `${smodelModelBLabel} Table Expression`,
+      'Column ID',
+      `${smodelModelALabel} Display Name`,
+      `${smodelModelBLabel} Display Name`,
+      `${smodelModelALabel} Description`,
+      `${smodelModelBLabel} Description`,
+      `${smodelModelALabel} Datatype`,
+      `${smodelModelBLabel} Datatype`,
+      `${smodelModelALabel} Hidden`,
+      `${smodelModelBLabel} Hidden`,
+      `${smodelModelALabel} Expression`,
+      `${smodelModelBLabel} Expression`,
+      `${smodelModelALabel} Dataset Import Query`,
+      `${smodelModelBLabel} Dataset Import Query`,
+      `${smodelModelALabel} Table Import Query`,
+      `${smodelModelBLabel} Table Import Query`,
+      `${smodelModelALabel} Table Query`,
+      `${smodelModelBLabel} Table Query`,
+    ];
+
+    const rows = visibleSmodelRows.map((row) => [
+      row.status,
+      row.tableName,
+      row.columnName,
+      row.mismatchFields.join(', '),
+      row.extraColumnsInModelA,
+      row.extraColumnsInModelB,
+      row.joinCountModelA,
+      row.joinCountModelB,
+      row.joinCountDiff,
+      row.tableQueryDiff ? 'Yes' : 'No',
+      row.customTableDiff ? 'Yes' : 'No',
+      row.hiddenDiffCount,
+      row.datatypeDiffCount,
+      row.datasetId,
+      row.datasetName,
+      row.schemaName,
+      row.tableId,
+      row.leftTableType,
+      row.rightTableType,
+      row.leftTableExpression,
+      row.rightTableExpression,
+      row.columnId,
+      row.leftDisplayName,
+      row.rightDisplayName,
+      row.leftDescription,
+      row.rightDescription,
+      row.leftDataType,
+      row.rightDataType,
+      row.leftHidden,
+      row.rightHidden,
+      row.leftExpression,
+      row.rightExpression,
+      row.leftDatasetImportQuery,
+      row.rightDatasetImportQuery,
+      row.leftTableImportQuery,
+      row.rightTableImportQuery,
+      row.leftTableQuery,
+      row.rightTableQuery,
+    ]);
+
+    const workbookXml = `<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Worksheet ss:Name="Smodel Compare">
+  <Table>
+   <Row>${headers.map((header) => `<Cell><Data ss:Type="String">${escapeXml(header)}</Data></Cell>`).join('')}</Row>
+   ${rows
+     .map(
+       (row) =>
+         `<Row>${row
+           .map((value) => `<Cell><Data ss:Type="String">${escapeXml(value)}</Data></Cell>`)
+           .join('')}</Row>`
+     )
+     .join('')}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${toDownloadSafeName(smodelModelALabel)}_vs_${toDownloadSafeName(smodelModelBLabel)}_compare_table.xls`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const exportComparisonCsv = () => {
     if (!compareResult) return;
@@ -673,18 +1029,21 @@ export default function AuditPage() {
         error?: string;
         model_a_label?: string;
         model_b_label?: string;
-        sheets?: {
-          METADATA?: PythonSmodelMetadataRow[];
-        };
+        model_a_name?: string;
+        model_b_name?: string;
+        sheets?: PythonSmodelSheets;
       };
       if (!dataResponse.ok) {
         throw new Error(dataJson.error || 'Failed to load Python comparison sheet data.');
       }
 
-      const metadataRows = Array.isArray(dataJson.sheets?.METADATA) ? dataJson.sheets.METADATA : [];
       const leftLabel = dataJson.model_a_label || smodelLeftFile.name;
       const rightLabel = dataJson.model_b_label || smodelRightFile.name;
-      setSmodelRows(buildSmodelRowsFromPythonMetadata(metadataRows, leftLabel, rightLabel));
+      const modelAName = dataJson.model_a_name || leftLabel;
+      const modelBName = dataJson.model_b_name || rightLabel;
+      setSmodelModelALabel(stripFileExtension(smodelLeftFile.name));
+      setSmodelModelBLabel(stripFileExtension(smodelRightFile.name));
+      setSmodelRows(buildSmodelRowsFromPythonMetadata(dataJson.sheets ?? {}, leftLabel, rightLabel, modelAName, modelBName));
       setSmodelFilter('all');
 
       const formData = new FormData();
@@ -708,7 +1067,9 @@ export default function AuditPage() {
       }
 
       const disposition = response.headers.get('Content-Disposition');
-      const suggestedFilename = parseFilenameFromContentDisposition(disposition) || `smodel_comparison_${Date.now()}.xlsx`;
+      const suggestedFilename =
+        parseFilenameFromContentDisposition(disposition) ||
+        `${toDownloadSafeName(smodelLeftFile.name)}_vs_${toDownloadSafeName(smodelRightFile.name)}_comparison.xlsx`;
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -1232,7 +1593,7 @@ export default function AuditPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <ArrowDownUp size={16} />
-                {smodelCompareLoading ? 'Building Workbook...' : 'Compare and Download Workbook'}
+                {smodelCompareLoading ? 'Building Comparison Table and Workbook...' : 'Build Comparison Table and Download Workbook'}
               </button>
             </div>
 
@@ -1257,35 +1618,50 @@ export default function AuditPage() {
                       <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-600">Smodel Side-By-Side</p>
                       <h3 className="mt-1 text-xl font-black tracking-tight">Model A vs Model B table comparison</h3>
                       <p className="mt-1 text-sm text-slate-500">
-                        Compared by Dataset + Schema + Table ID + Column ID. Mirrors metadata extraction logic from the Python script.
+                        Compared by table name and column name. Shows metadata, joins, queries, hidden flags, and datatype differences.
                       </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
+                        <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">{smodelModelALabel}</span>
+                        <span className="text-slate-400">vs</span>
+                        <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">{smodelModelBLabel}</span>
+                      </div>
                     </div>
                     <div className="grid gap-2 text-xs font-bold">
                       <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">Rows: {smodelRows.length}</span>
+                      <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-700">Matches: {smodelMatchedCount}</span>
                       <span className="rounded-full bg-rose-100 px-3 py-1.5 text-rose-700">Mismatches: {smodelMismatchCount}</span>
                     </div>
                   </div>
-                  <div className="mt-4 inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-bold">
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setSmodelFilter('all')}
+                        className={`rounded-xl px-3 py-2 ${smodelFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                      >
+                        All Rows
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSmodelFilter('match')}
+                        className={`rounded-xl px-3 py-2 ${smodelFilter === 'match' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                      >
+                        Match Only
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSmodelFilter('mismatch')}
+                        className={`rounded-xl px-3 py-2 ${smodelFilter === 'mismatch' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                      >
+                        Mismatches Only
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setSmodelFilter('all')}
-                      className={`rounded-xl px-3 py-2 ${smodelFilter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                      onClick={exportSmodelComparisonWorkbook}
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
                     >
-                      All Rows
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSmodelFilter('match')}
-                      className={`rounded-xl px-3 py-2 ${smodelFilter === 'match' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
-                    >
-                      Match Only
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSmodelFilter('mismatch')}
-                      className={`rounded-xl px-3 py-2 ${smodelFilter === 'mismatch' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
-                    >
-                      Mismatches Only
+                      Download Compare Table
                     </button>
                   </div>
                 </div>
@@ -1295,18 +1671,27 @@ export default function AuditPage() {
                     <thead className="sticky top-0 z-10 bg-slate-950 text-white">
                       <tr>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Status</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Table</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Column</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Mismatch Fields</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Extra Cols A</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Extra Cols B</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Join Count A</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Join Count B</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Join Diff</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Table Query Diff</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Custom Table Diff</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Hidden Diff Count</th>
+                        <th className="border border-slate-800 px-3 py-2 font-bold">Datatype Diff Count</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Dataset ID</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Dataset</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Schema</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Table ID</th>
-                        <th className="border border-slate-800 px-3 py-2 font-bold">Table</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Model A Table Type</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Model B Table Type</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Model A Table Expression</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Model B Table Expression</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Column ID</th>
-                        <th className="border border-slate-800 px-3 py-2 font-bold">Column</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Model A Display Name</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Model B Display Name</th>
                         <th className="border border-slate-800 px-3 py-2 font-bold">Model A Description</th>
@@ -1337,20 +1722,29 @@ export default function AuditPage() {
                               {row.status}
                             </span>
                           </td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.tableName || '-'}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnName || '-'}</td>
                           <td className="border border-slate-200 px-3 py-2 text-slate-700">
                             {row.mismatchFields.length ? row.mismatchFields.join(', ') : '-'}
                           </td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.extraColumnsInModelA ? 'text-rose-700 font-semibold' : 'text-slate-700'}`}>{row.extraColumnsInModelA}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.extraColumnsInModelB ? 'text-rose-700 font-semibold' : 'text-slate-700'}`}>{row.extraColumnsInModelB}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.joinCountModelA}</td>
+                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.joinCountModelB}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.joinCountDiff ? 'text-rose-700 font-semibold' : 'text-slate-700'}`}>{row.joinCountDiff}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.tableQueryDiff ? 'text-rose-700 font-semibold' : 'text-slate-700'}`}>{row.tableQueryDiff ? 'Yes' : '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.customTableDiff ? 'text-rose-700 font-semibold' : 'text-slate-700'}`}>{row.customTableDiff ? 'Yes' : '-'}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.hiddenDiffCount ? 'text-rose-700 font-semibold' : 'text-slate-700'}`}>{row.hiddenDiffCount}</td>
+                          <td className={`border border-slate-200 px-3 py-2 ${row.datatypeDiffCount ? 'text-rose-700 font-semibold' : 'text-slate-700'}`}>{row.datatypeDiffCount}</td>
                           <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.datasetId || '-'}</td>
                           <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.datasetName || '-'}</td>
                           <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.schemaName || '-'}</td>
                           <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.tableId || '-'}</td>
-                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.tableName || '-'}</td>
                           <td className={`border border-slate-200 px-3 py-2 ${row.leftTableType === row.rightTableType ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftTableType || '-'}</td>
                           <td className={`border border-slate-200 px-3 py-2 ${row.leftTableType === row.rightTableType ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightTableType || '-'}</td>
                           <td className={`border border-slate-200 px-3 py-2 ${row.leftTableExpression === row.rightTableExpression ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftTableExpression || '-'}</td>
                           <td className={`border border-slate-200 px-3 py-2 ${row.leftTableExpression === row.rightTableExpression ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightTableExpression || '-'}</td>
                           <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnId || '-'}</td>
-                          <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnName || '-'}</td>
                           <td className={`border border-slate-200 px-3 py-2 ${row.leftDisplayName === row.rightDisplayName ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftDisplayName || '-'}</td>
                           <td className={`border border-slate-200 px-3 py-2 ${row.leftDisplayName === row.rightDisplayName ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.rightDisplayName || '-'}</td>
                           <td className={`border border-slate-200 px-3 py-2 ${row.leftDescription === row.rightDescription ? 'text-slate-700' : 'text-rose-700 font-semibold'}`}>{row.leftDescription || '-'}</td>
@@ -1371,7 +1765,7 @@ export default function AuditPage() {
                       ))}
                       {visibleSmodelRows.length === 0 ? (
                         <tr>
-                          <td colSpan={28} className="border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+                          <td colSpan={37} className="border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
                             No rows found for the selected filter.
                           </td>
                         </tr>
