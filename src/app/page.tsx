@@ -36,10 +36,13 @@ interface ActionCardProps {
   btnColor: string;
   hoverBorder: string;
   onClick: () => void;
+  disabled?: boolean;
+  disabledTitle?: string;
 }
 
 export default function QaLandingPage() {
   const router = useRouter();
+  const isAdminEnabled = (process.env.NEXT_PUBLIC_ADMIN ?? 'no').trim().toLowerCase() === 'yes';
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col relative overflow-hidden">
@@ -84,7 +87,7 @@ export default function QaLandingPage() {
           </p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 mb-20">
           <ActionCard
             title="Master"
             highlight="Informer"
@@ -94,6 +97,17 @@ export default function QaLandingPage() {
             btnColor="bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700"
             hoverBorder="hover:border-slate-400 hover:shadow-slate-200"
             onClick={() => router.push('/dashfile')}
+          />
+
+          <ActionCard
+            title="Smodel"
+            highlight="Inspector"
+            highlightColor="text-cyan-600"
+            desc="Open the Sisense model comparison workspace directly and inspect model differences without leaving the landing page flow."
+            btnText="Open Inspector"
+            btnColor="bg-cyan-600 shadow-cyan-200 hover:bg-cyan-700"
+            hoverBorder="hover:border-cyan-500 hover:shadow-cyan-100"
+            onClick={() => router.push('/smodel-inspector')}
           />
 
           <ActionCard
@@ -119,14 +133,16 @@ export default function QaLandingPage() {
           />
 
           <ActionCard
-            title="Audit"
+            title="Dev"
             highlight="Workspace"
             highlightColor="text-sky-600"
-            desc="Open the audit workspace for file compare, model compare, widget inventory, and function lookup."
-            btnText="Open Audit"
+            desc="Open the audit workspace for file compare, widget inventory, function lookup, and table transfer."
+            btnText={isAdminEnabled ? 'Open Workspace' : 'Admin Only'}
             btnColor="bg-sky-600 shadow-sky-200 hover:bg-sky-700"
             hoverBorder="hover:border-sky-500 hover:shadow-sky-100"
             onClick={() => router.push('/audit')}
+            disabled={!isAdminEnabled}
+            disabledTitle={!isAdminEnabled ? 'Admin access required' : undefined}
           />
         </div>
 
@@ -170,11 +186,27 @@ export default function QaLandingPage() {
   );
 }
 
-function ActionCard({ title, highlight, highlightColor, desc, btnText, btnColor, hoverBorder, onClick }: ActionCardProps) {
+function ActionCard({
+  title,
+  highlight,
+  highlightColor,
+  desc,
+  btnText,
+  btnColor,
+  hoverBorder,
+  onClick,
+  disabled = false,
+  disabledTitle,
+}: ActionCardProps) {
   return (
     <button
       onClick={onClick}
-      className={`group relative bg-white border border-slate-200 p-8 rounded-[28px] transition-all hover:shadow-2xl ${hoverBorder} text-left shadow-sm overflow-hidden flex flex-col justify-between`}
+      disabled={disabled}
+      aria-disabled={disabled}
+      title={disabled ? disabledTitle : undefined}
+      className={`group relative bg-white border border-slate-200 p-8 rounded-[28px] transition-all text-left shadow-sm overflow-hidden flex flex-col justify-between ${
+        disabled ? 'cursor-not-allowed opacity-65' : `hover:shadow-2xl ${hoverBorder}`
+      }`}
     >
       <div>
         <h2 className="text-xl font-black text-slate-900 mb-1 uppercase italic tracking-tight">
@@ -189,8 +221,12 @@ function ActionCard({ title, highlight, highlightColor, desc, btnText, btnColor,
         </h2>
         <p className="text-[13px] text-slate-400 group-hover:text-slate-600 mb-6 transition-colors font-medium">{desc}</p>
       </div>
-      <div className={`inline-flex items-center gap-2 text-white px-4 py-2 rounded-xl font-bold text-[10px] uppercase transition-all group-hover:scale-105 shadow-lg w-fit ${btnColor}`}>
-        {btnText} {'->'}
+      <div
+        className={`inline-flex items-center gap-2 text-white px-4 py-2 rounded-xl font-bold text-[10px] uppercase shadow-lg w-fit ${
+          disabled ? 'bg-slate-400 shadow-slate-200' : `${btnColor} transition-all group-hover:scale-105`
+        }`}
+      >
+        {btnText}
       </div>
     </button>
   );

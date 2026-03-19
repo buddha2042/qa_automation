@@ -9,8 +9,8 @@ Given 2 Sisense Elasticube exports (.smodel JSON files), this script produces a 
   4) JOIN_SUMMARY    - per table, compares join-count (table appearances in joins) between the two models
   5) TABLE_QUERIES   : per table, compares where table_expression is present and differs
   6) CUSTOM_TABLES   : per table, compares custom tables where table query differs
-  7) HIDDEN_COLUMNS  : per table, compares columns where hidden differs for same (table_id, column_id)
-  8) DATATYPES       : per table, compares columns where dataType differs for same (table_id, column_id)
+  7) HIDDEN_COLUMNS  : per table, compares columns where hidden differs for same logical (table_name, column_name)
+  8) DATATYPES       : per table, compares columns where dataType differs for same logical (table_name, column_name)
   
 Usage:
   python sisense_smodel_comparison_extract_v2.py modelA.smodel modelB.smodel --out combined_smodel_metadata_summary.xlsx
@@ -245,9 +245,13 @@ def normalize_table_name(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "").strip()).lower()
 
 
+def logical_table_key_cols() -> List[str]:
+    return ["_table_name_key"]
+
+
 def build_column_summary_by_names(metadata: pd.DataFrame) -> pd.DataFrame:
     """Per logical table, compare column sets using normalized table and column names."""
-    key_cols = ["database", "schemaName", "_table_name_key"]
+    key_cols = logical_table_key_cols()
     df = metadata.copy()
     df = df[df["table_name"].notna() & df["column_name"].notna()]
 
@@ -277,7 +281,9 @@ def build_column_summary_by_names(metadata: pd.DataFrame) -> pd.DataFrame:
     table_lookup = (
         df.groupby(key_cols, dropna=False)
         .agg(
+            database=("database", lambda s: next((x for x in s if x), "")),
             dataset_id=("dataset_id", lambda s: next((x for x in s if x), "")),
+            schemaName=("schemaName", lambda s: next((x for x in s if x), "")),
             table_name=("table_name", lambda s: next((x for x in s if x), "")),
             table_id=("table_id", lambda s: next((x for x in s if x), "")),
         )
@@ -292,14 +298,14 @@ def build_column_summary_by_names(metadata: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
     name_dict = {
-        (r["database"], r["schemaName"], r["_table_name_key"], r["model"], r["_col_name_key"]): r["column_name"]
+        (r["_table_name_key"], r["model"], r["_col_name_key"]): r["column_name"]
         for _, r in name_map.iterrows()
     }
 
     def _as_set(v: Any) -> set:
         return v if isinstance(v, set) else set()
 
-    out = pivot[key_cols + ["dataset_id", "table_name", "table_id"]].copy()
+    out = pivot[key_cols + ["database", "dataset_id", "schemaName", "table_name", "table_id"]].copy()
     out[f"column_count_in_{m1}"] = 0
     out[f"column_count_in_{m2}"] = 0
     out[f"column_count_diff_{m2}_minus_{m1}"] = 0
@@ -322,9 +328,9 @@ def build_column_summary_by_names(metadata: pd.DataFrame) -> pd.DataFrame:
         out.loc[i, f"unique_cols_in_{m1}"] = len(d1)
         out.loc[i, f"unique_cols_in_{m2}"] = len(d2)
 
-        base = (r["database"], r["schemaName"], r["_table_name_key"])
-        names1 = [name_dict.get((*base, m1, col_name_key), col_name_key) for col_name_key in d1]
-        names2 = [name_dict.get((*base, m2, col_name_key), col_name_key) for col_name_key in d2]
+        base = r["_table_name_key"]
+        names1 = [name_dict.get((base, m1, col_name_key), col_name_key) for col_name_key in d1]
+        names2 = [name_dict.get((base, m2, col_name_key), col_name_key) for col_name_key in d2]
         out.loc[i, f"unique_col_ids_in_{m1}"] = ", ".join(names1)
         out.loc[i, f"unique_col_ids_in_{m2}"] = ", ".join(names2)
         out.loc[i, f"unique_col_names_in_{m1}"] = ", ".join([name for name in names1 if name.strip()])
@@ -335,16 +341,15 @@ def build_column_summary_by_names(metadata: pd.DataFrame) -> pd.DataFrame:
 
 
 def table_level_df(metadata: pd.DataFrame) -> pd.DataFrame:
-    """Unique table rows per (model, table_id) with table-level metadata and normalized 'table_query'."""
+    """Unique table rows per logical table name with table-level metadata and normalized 'table_query'."""
     df = metadata.copy()
-    df = df[df["table_id"].notna()]
+    df = df[df["table_name"].notna()]
 
     for c in [
         "model",
         "database",
         "dataset_id",
         "schemaName",
-        "table_id",
         "table_name",
         "table_type",
         "table_expression",
@@ -354,6 +359,9 @@ def table_level_df(metadata: pd.DataFrame) -> pd.DataFrame:
             df[c] = ""
         df[c] = df[c].fillna("").astype(str)
 
+    df["_table_name_key"] = df["table_name"].apply(normalize_table_name)
+    df = df[df["_table_name_key"] != ""]
+
     def _first_nonempty(series):
         for x in series:
             if isinstance(x, str) and x.strip() != "":
@@ -361,11 +369,12 @@ def table_level_df(metadata: pd.DataFrame) -> pd.DataFrame:
         return ""
 
     grouped = (
-        df.groupby(["model", "table_id"], dropna=False)
+        df.groupby(["model", "_table_name_key"], dropna=False)
         .agg(
             database=("database", _first_nonempty),
             dataset_id=("dataset_id", _first_nonempty),
             schemaName=("schemaName", _first_nonempty),
+            table_id=("table_id", _first_nonempty),
             table_name=("table_name", _first_nonempty),
             table_type=("table_type", _first_nonempty),
             table_expression=("table_expression", _first_nonempty),
@@ -388,8 +397,8 @@ def build_query_diff_tab(
     sheet_name: str,
 ) -> pd.DataFrame:
     """
-    Per-table comparison of query text for matching table_id across the two models.
-    Produces one row per table_id (union across the two models for the filtered table types).
+    Per-table comparison of query text for matching logical table names across the two models.
+    Produces one row per logical table name (union across the two models for the filtered table types).
     """
     df = tables.copy()
 
@@ -402,24 +411,27 @@ def build_query_diff_tab(
     if require_expression:
         df = df[df["table_expression"].str.strip() != ""]
 
+    df["_table_name_key"] = df["table_name"].apply(normalize_table_name)
+    df = df[df["_table_name_key"] != ""]
+
     a_df = df[df["model"] == model_a][
-        ["database", "dataset_id", "schemaName", "table_id", "table_name", "table_query"]
+        ["database", "dataset_id", "schemaName", "_table_name_key", "table_id", "table_name", "table_query"]
     ].rename(
         columns={"table_name": f"table_name_in_{model_a}", "table_query": f"table_query_in_{model_a}"}
     )
 
     b_df = df[df["model"] == model_b][
-        ["database", "dataset_id", "schemaName", "table_id", "table_name", "table_query"]
+        ["database", "dataset_id", "schemaName", "_table_name_key", "table_id", "table_name", "table_query"]
     ].rename(
         columns={"table_name": f"table_name_in_{model_b}", "table_query": f"table_query_in_{model_b}"}
     )
 
-    merged = a_df.merge(b_df, on="table_id", how="outer", suffixes=("_a", "_b"))
+    merged = a_df.merge(b_df, on=["_table_name_key"], how="outer", suffixes=("_a", "_b"))
 
-    # Coalesce common table-level metadata (prefer model_a when present)
-    merged["database"] = merged["database_a"].where(merged["database_a"].str.strip() != "", merged["database_b"])
+    merged["database"] = merged["database_a"].where(merged["database_a"].fillna("").str.strip() != "", merged["database_b"])
     merged["dataset_id"] = merged["dataset_id_a"].where(merged["dataset_id_a"].str.strip() != "", merged["dataset_id_b"])
-    merged["schemaName"] = merged["schemaName_a"].where(merged["schemaName_a"].str.strip() != "", merged["schemaName_b"])
+    merged["schemaName"] = merged["schemaName_a"].where(merged["schemaName_a"].fillna("").str.strip() != "", merged["schemaName_b"])
+    merged["table_id"] = merged["table_id_a"].where(merged["table_id_a"].str.strip() != "", merged["table_id_b"])
 
     merged["table_name"] = merged[f"table_name_in_{model_a}"].where(
         merged[f"table_name_in_{model_a}"].fillna("").str.strip() != "",
@@ -476,10 +488,12 @@ def build_column_attr_diff_tab(
     df["_column_name_key"] = df["column_name"].apply(normalize_column_name)
     df = df[(df["_table_name_key"] != "") & (df["_column_name_key"] != "")]
 
-    key = ["database", "schemaName", "_table_name_key", "_column_name_key"]
+    key = ["_table_name_key", "_column_name_key"]
 
     a = df[df["model"] == model_a].groupby(key, dropna=False).agg(
+        database=("database", lambda s: next((x for x in s if x), "")),
         dataset_id=("dataset_id", lambda s: next((x for x in s if x), "")),
+        schemaName=("schemaName", lambda s: next((x for x in s if x), "")),
         table_id=("table_id", lambda s: next((x for x in s if x), "")),
         table_name=("table_name", lambda s: next((x for x in s if x), "")),
         column_id=("column_id", lambda s: next((x for x in s if x), "")),
@@ -525,8 +539,10 @@ def build_column_attr_diff_tab(
                 return x
         return ""
 
-    per_table = diff.groupby(["database", "schemaName", "_table_name_key"], dropna=False).agg(
+    per_table = diff.groupby(["_table_name_key"], dropna=False).agg(
+        database=("database", _first_nonempty),
         dataset_id=("dataset_id", _first_nonempty),
+        schemaName=("schemaName", _first_nonempty),
         table_id=("table_id", _first_nonempty),
         table_name=("table_name", _first_nonempty),
         diff_count=("_column_name_key", "size"),
@@ -538,9 +554,11 @@ def build_column_attr_diff_tab(
     if attr == "hidden":
         hidden_totals_a = (
             df[df["model"] == model_a]
-            .groupby(["database", "schemaName", "_table_name_key"], dropna=False)
+            .groupby(["_table_name_key"], dropna=False)
             .agg(
+                database=("database", _first_nonempty),
                 dataset_id=("dataset_id", _first_nonempty),
+                schemaName=("schemaName", _first_nonempty),
                 table_id=("table_id", _first_nonempty),
                 table_name=("table_name", _first_nonempty),
                 hidden_total_in_model_a=("_attr_norm", lambda s: sum(value == "true" for value in s)),
@@ -549,9 +567,11 @@ def build_column_attr_diff_tab(
         )
         hidden_totals_b = (
             df[df["model"] == model_b]
-            .groupby(["database", "schemaName", "_table_name_key"], dropna=False)
+            .groupby(["_table_name_key"], dropna=False)
             .agg(
+                database_b=("database", _first_nonempty),
                 dataset_id_b=("dataset_id", _first_nonempty),
+                schemaName_b=("schemaName", _first_nonempty),
                 table_id_b=("table_id", _first_nonempty),
                 table_name_b=("table_name", _first_nonempty),
                 hidden_total_in_model_b=("_attr_norm", lambda s: sum(value == "true" for value in s)),
@@ -560,12 +580,20 @@ def build_column_attr_diff_tab(
         )
         hidden_totals = hidden_totals_a.merge(
             hidden_totals_b,
-            on=["database", "schemaName", "_table_name_key"],
+            on=["_table_name_key"],
             how="outer",
+        )
+        hidden_totals["database"] = hidden_totals["database"].where(
+            hidden_totals.get("database", "").fillna("").astype(str).str.strip() != "",
+            hidden_totals.get("database_b", ""),
         )
         hidden_totals["dataset_id"] = hidden_totals["dataset_id"].where(
             hidden_totals.get("dataset_id", "").fillna("").astype(str).str.strip() != "",
             hidden_totals.get("dataset_id_b", ""),
+        )
+        hidden_totals["schemaName"] = hidden_totals["schemaName"].where(
+            hidden_totals.get("schemaName", "").fillna("").astype(str).str.strip() != "",
+            hidden_totals.get("schemaName_b", ""),
         )
         hidden_totals["table_id"] = hidden_totals["table_id"].where(
             hidden_totals.get("table_id", "").fillna("").astype(str).str.strip() != "",
@@ -582,10 +610,10 @@ def build_column_attr_diff_tab(
         )
         per_table = per_table.merge(
             hidden_totals,
-            on=["database", "schemaName", "_table_name_key"],
+            on=["_table_name_key"],
             how="outer",
         )
-        for c in ["dataset_id", "table_id", "table_name"]:
+        for c in ["database", "dataset_id", "schemaName", "table_id", "table_name"]:
             if c not in per_table.columns:
                 per_table[c] = ""
             fallback = f"{c}_b"
@@ -825,10 +853,12 @@ def build_join_summary(joins_df: pd.DataFrame, model_a_label: str, model_b_label
 
     # Count join appearances per table per source file
     counts = (
-        occ.groupby(["source_file", "database", "schemaName", "_table_name_key"], dropna=False)
+        occ.groupby(["source_file", "_table_name_key"], dropna=False)
         .agg(
             join_count=("table_id", "size"),
+            database=("database", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
             dataset_id=("dataset_id", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
+            schemaName=("schemaName", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
             table_id=("table_id", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
             table_name=("table_name", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
         )
@@ -837,7 +867,7 @@ def build_join_summary(joins_df: pd.DataFrame, model_a_label: str, model_b_label
 
     pivot = (
         counts.pivot_table(
-            index=["database", "schemaName", "_table_name_key", "table_name"],
+            index=["_table_name_key", "table_name"],
             columns="source_file",
             values="join_count",
             aggfunc="sum",
@@ -847,14 +877,16 @@ def build_join_summary(joins_df: pd.DataFrame, model_a_label: str, model_b_label
     )
 
     meta_lookup = (
-        counts.groupby(["database", "schemaName", "_table_name_key", "table_name"], dropna=False)
+        counts.groupby(["_table_name_key", "table_name"], dropna=False)
         .agg(
+            database=("database", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
             dataset_id=("dataset_id", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
+            schemaName=("schemaName", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
             table_id=("table_id", lambda s: next((x for x in s if pd.notna(x) and str(x).strip() != ""), "")),
         )
         .reset_index()
     )
-    pivot = pivot.merge(meta_lookup, on=["database", "schemaName", "_table_name_key", "table_name"], how="left")
+    pivot = pivot.merge(meta_lookup, on=["_table_name_key", "table_name"], how="left")
 
     for col in [model_a_label, model_b_label]:
         if col not in pivot.columns:
