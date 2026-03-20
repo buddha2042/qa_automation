@@ -14,7 +14,17 @@ interface SmodelTransferPreview {
   previousTargetRelationCount: number;
   updatedTargetRelationCount: number;
   copiedRelationCount: number;
+  sourceRelations: SmodelTransferRelationPreview[];
+  previousTargetRelations: SmodelTransferRelationPreview[];
+  copiedRelations: SmodelTransferRelationPreview[];
   warnings: string[];
+}
+
+interface SmodelTransferRelationPreview {
+  relationOid: string;
+  relationType: string;
+  summary: string;
+  json: string;
 }
 
 interface SmodelTableCandidate {
@@ -317,8 +327,13 @@ export default function SmodelTableTransferWorkspace({
 
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <TransferStatCard label="Existing Target Table" value={preview.targetTableFound ? 'Yes' : 'No'} />
+            <TransferStatCard label="Source Joins" value={String(preview.sourceRelations.length)} />
             <TransferStatCard label="Previous Target Joins" value={String(preview.previousTargetRelationCount)} />
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
             <TransferStatCard label="Copied Joins" value={String(preview.copiedRelationCount)} />
+            <TransferStatCard label="Updated Target Joins" value={String(preview.updatedTargetRelationCount)} />
           </div>
 
           {preview.warnings.length ? (
@@ -334,6 +349,24 @@ export default function SmodelTableTransferWorkspace({
               body={preview.previousTargetTableJson || 'Target table did not exist before transfer.'}
             />
             <TransferPreviewCard title="Updated Target Table Block" body={preview.updatedTargetTableJson} />
+          </div>
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-3">
+            <TransferRelationCard
+              title="Source Table Joins"
+              relations={preview.sourceRelations}
+              emptyText="No source joins were found for the selected table."
+            />
+            <TransferRelationCard
+              title="Previous Target Joins"
+              relations={preview.previousTargetRelations}
+              emptyText="No existing target joins were attached to the overwritten table."
+            />
+            <TransferRelationCard
+              title="Copied Joins"
+              relations={preview.copiedRelations}
+              emptyText="No joins were copied into the target model."
+            />
           </div>
         </section>
       ) : null}
@@ -453,6 +486,41 @@ function TransferPreviewCard({ title, body }: { title: string; body: string }) {
         <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{title}</p>
       </div>
       <pre className="max-h-[28rem] overflow-auto bg-slate-950 px-4 py-4 text-xs text-slate-100">{body}</pre>
+    </div>
+  );
+}
+
+function TransferRelationCard({
+  title,
+  relations,
+  emptyText,
+}: {
+  title: string;
+  relations: SmodelTransferRelationPreview[];
+  emptyText: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{title}</p>
+      </div>
+      {relations.length ? (
+        <div className="max-h-[28rem] space-y-3 overflow-auto bg-slate-50 p-4">
+          {relations.map((relation, index) => (
+            <div key={`${relation.relationOid || 'relation'}-${index}`} className="rounded-2xl border border-slate-200 bg-white">
+              <div className="border-b border-slate-200 px-4 py-3">
+                <p className="text-xs font-bold text-slate-900">{relation.summary || 'Join identified'}</p>
+                <p className="mt-1 text-[11px] text-slate-500">
+                  OID: {relation.relationOid || '-'} | Type: {relation.relationType || '-'}
+                </p>
+              </div>
+              <pre className="overflow-auto bg-slate-950 px-4 py-4 text-xs text-slate-100">{relation.json}</pre>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="px-4 py-4 text-sm text-slate-500">{emptyText}</div>
+      )}
     </div>
   );
 }
