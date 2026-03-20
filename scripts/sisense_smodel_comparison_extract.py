@@ -2,12 +2,12 @@
 """
 sisense_smodel_comparison_extract_v2.py
    
-Given 2 Sisense Elasticube exports (.smodel JSON files), this script produces a single workbook with 4 sheets:
+Given 2 Sisense Elasticube exports (.smodel JSON files), this script produces a workbook with these sheets:
   1) METADATA        - raw row-level dataset/table/column metadata from both models
   2) JOINS_METADATA  - all join (relation) rows from both models
   3) COLUMN_SUMMARY  - per table, compares column uniqueness between the two models using normalized column names
-  4) JOIN_SUMMARY    - per table, compares join-count (table appearances in joins) between the two models
-  5) TABLE_QUERIES   : per table, compares where table_expression is present and differs
+  4) JOIN_SUMMARY    - per table, compares unique relation-group counts between the two models
+  5) TABLE_QUERIES   : per table, compares effective table query text across the two models
   6) CUSTOM_TABLES   : per table, compares custom tables where table query differs
   7) HIDDEN_COLUMNS  : per table, compares columns where hidden differs for same logical (table_name, column_name)
   8) DATATYPES       : per table, compares columns where dataType differs for same logical (table_name, column_name)
@@ -329,6 +329,7 @@ def extract_metadata(model: Dict[str, Any], source_file: str, model_name: str) -
                         "dataType": c.get("dataType"),
                         "dataTypeGroup": normalize_data_type_group(c.get("dataType")),
                         "originalDataType": c.get("originalDataType"),
+                        "originalDataTypeGroup": normalize_data_type_group(c.get("originalDataType")),
                         "expression": c.get("expression"),
                         "column_origin": c.get("columnOrigin"),
                         "is_custom_field": c.get("columnOrigin") == "add-column",
@@ -445,6 +446,139 @@ def logical_table_key_cols() -> List[str]:
     return ["_table_name_key"]
 
 
+def is_truthy_flag(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"true", "1", "yes"}
+
+
+def extract_table_field_inventory(model: Dict[str, Any], model_name: str) -> pd.DataFrame:
+    rows: List[Dict[str, Any]] = []
+
+    for ds in (model.get("datasets") or []):
+        ds_database = str(ds.get("database") or "")
+        schemaName = _schema_name_from_ds(ds)
+        ds_id = ds.get("id") or ds.get("oid") or ""
+
+        for table in get_dataset_tables(ds):
+            table_name = str(table.get("displayName") or table.get("name") or table.get("id") or "")
+            table_id = table.get("id") or table.get("oid") or ""
+            if not table_name:
+                continue
+
+            base_columns = table.get("columns") or []
+            effective_columns = build_effective_columns(table)
+            physical_columns = [column for column in effective_columns if column.get("columnOrigin") != "add-column"]
+            custom_columns = [column for column in effective_columns if column.get("columnOrigin") == "add-column"]
+
+            field_count_without_custom = len(base_columns)
+            custom_field_count = len(custom_columns)
+            total_field_count = field_count_without_custom + custom_field_count
+            dropped_field_count = max(field_count_without_custom - len(physical_columns), 0)
+            available_field_count = sum(
+                1 for column in physical_columns if not is_truthy_flag(column.get("hidden"))
+            )
+
+            rows.append(
+                {
+                    "model": model_name,
+                    "database": ds_database,
+                    "dataset_id": ds_id,
+                    "schemaName": schemaName,
+                    "table_id": table_id,
+                    "table_name": table_name,
+                    "field_count_without_custom": field_count_without_custom,
+                    "custom_field_count": custom_field_count,
+                    "total_field_count": total_field_count,
+                    "available_field_count": available_field_count,
+                    "dropped_field_count": dropped_field_count,
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
+def build_field_count_summary(field_inventory: pd.DataFrame) -> pd.DataFrame:
+    key_cols = logical_table_key_cols()
+    df = field_inventory.copy()
+    if df.empty:
+        return pd.DataFrame(
+            columns=[
+                "database",
+                "dataset_id",
+                "schemaName",
+                "table_name",
+                "table_id",
+                "total_field_count_in_model_a",
+                "total_field_count_in_model_b",
+                "total_field_count_diff_model_b_minus_model_a",
+                "field_count_without_custom_in_model_a",
+                "field_count_without_custom_in_model_b",
+                "custom_field_count_in_model_a",
+                "custom_field_count_in_model_b",
+                "available_field_count_in_model_a",
+                "available_field_count_in_model_b",
+                "dropped_field_count_in_model_a",
+                "dropped_field_count_in_model_b",
+            ]
+        )
+
+    for c in ["database", "dataset_id", "schemaName", "model", "table_id", "table_name"]:
+        df[c] = df[c].fillna("").astype(str)
+    df["_table_name_key"] = df["table_name"].apply(normalize_table_name)
+    df = df[df["_table_name_key"] != ""]
+
+    models = sorted(df["model"].dropna().unique().tolist())
+    if len(models) != 2:
+        raise ValueError(f"FIELD_COUNT_SUMMARY requires exactly 2 models; found: {models}")
+    m1, m2 = models[0], models[1]
+
+    table_lookup = (
+        df.groupby(key_cols, dropna=False)
+        .agg(
+            database=("database", lambda s: next((x for x in s if x), "")),
+            dataset_id=("dataset_id", lambda s: next((x for x in s if x), "")),
+            schemaName=("schemaName", lambda s: next((x for x in s if x), "")),
+            table_name=("table_name", lambda s: next((x for x in s if x), "")),
+            table_id=("table_id", lambda s: next((x for x in s if x), "")),
+        )
+        .reset_index()
+    )
+
+    def build_metric_pivot(metric_name: str) -> pd.DataFrame:
+        pivot = (
+            df.pivot_table(index=key_cols, columns="model", values=metric_name, aggfunc="first")
+            .reset_index()
+        )
+        pivot.columns = [str(c) for c in pivot.columns]
+        if m1 not in pivot.columns:
+            pivot[m1] = 0
+        if m2 not in pivot.columns:
+            pivot[m2] = 0
+        return pivot.rename(
+            columns={
+                m1: f"{metric_name}_in_{m1}",
+                m2: f"{metric_name}_in_{m2}",
+            }
+        )
+
+    out = table_lookup.copy()
+    for metric_name in [
+        "total_field_count",
+        "field_count_without_custom",
+        "custom_field_count",
+        "available_field_count",
+        "dropped_field_count",
+    ]:
+        out = out.merge(build_metric_pivot(metric_name), on=key_cols, how="left")
+
+    out[f"total_field_count_diff_{m2}_minus_{m1}"] = (
+        out[f"total_field_count_in_{m2}"] - out[f"total_field_count_in_{m1}"]
+    )
+
+    return out.sort_values(["database", "schemaName", "table_name"]).reset_index(drop=True)
+
+
 def build_column_summary_by_names(metadata: pd.DataFrame) -> pd.DataFrame:
     """Per logical table, compare column sets using normalized table and column names."""
     key_cols = logical_table_key_cols()
@@ -505,6 +639,49 @@ def build_column_summary_by_names(metadata: pd.DataFrame) -> pd.DataFrame:
 
     out = out.drop(columns=["_table_name_key"])
     return out.sort_values(["database", "schemaName", "table_name"]).reset_index(drop=True)
+
+
+def merge_field_counts_into_column_summary(
+    column_summary: pd.DataFrame,
+    field_count_summary: pd.DataFrame,
+    model_a_name: str,
+    model_b_name: str,
+) -> pd.DataFrame:
+    if column_summary.empty or field_count_summary.empty:
+        return column_summary
+
+    left = column_summary.copy()
+    right = field_count_summary.copy()
+    left["_table_name_key"] = left["table_name"].apply(normalize_table_name)
+    right["_table_name_key"] = right["table_name"].apply(normalize_table_name)
+
+    extra_columns = [
+        "_table_name_key",
+        f"total_field_count_in_{model_a_name}",
+        f"total_field_count_in_{model_b_name}",
+        f"total_field_count_diff_{model_b_name}_minus_{model_a_name}",
+        f"field_count_without_custom_in_{model_a_name}",
+        f"field_count_without_custom_in_{model_b_name}",
+        f"custom_field_count_in_{model_a_name}",
+        f"custom_field_count_in_{model_b_name}",
+        f"available_field_count_in_{model_a_name}",
+        f"available_field_count_in_{model_b_name}",
+        f"dropped_field_count_in_{model_a_name}",
+        f"dropped_field_count_in_{model_b_name}",
+    ]
+    merged = left.merge(right[extra_columns], on="_table_name_key", how="left")
+
+    merged[f"column_count_in_{model_a_name}"] = merged[f"total_field_count_in_{model_a_name}"].fillna(
+        merged[f"column_count_in_{model_a_name}"]
+    )
+    merged[f"column_count_in_{model_b_name}"] = merged[f"total_field_count_in_{model_b_name}"].fillna(
+        merged[f"column_count_in_{model_b_name}"]
+    )
+    merged[f"column_count_diff_{model_b_name}_minus_{model_a_name}"] = merged[
+        f"total_field_count_diff_{model_b_name}_minus_{model_a_name}"
+    ].fillna(merged[f"column_count_diff_{model_b_name}_minus_{model_a_name}"])
+
+    return merged.drop(columns=["_table_name_key"])
 
 
 def table_level_df(metadata: pd.DataFrame) -> pd.DataFrame:
@@ -576,7 +753,7 @@ def build_query_diff_tab(
 
     df = df[df["table_type"].isin(type_values)]
     if require_expression:
-        df = df[df["table_expression"].str.strip() != ""]
+        df = df[df["table_query"].str.strip() != ""]
 
     df["_table_name_key"] = df["table_name"].apply(normalize_table_name)
     df = df[df["_table_name_key"] != ""]
@@ -605,9 +782,9 @@ def build_query_diff_tab(
         merged.get(f"table_name_in_{model_b}", ""),
     )
 
-    qa = merged.get(f"table_query_in_{model_a}", "").fillna("")
-    qb = merged.get(f"table_query_in_{model_b}", "").fillna("")
-    merged["is_different"] = (qa != "") & (qb != "") & (qa != qb)
+    qa = merged.get(f"table_query_in_{model_a}", "").fillna("").astype(str).str.strip()
+    qb = merged.get(f"table_query_in_{model_b}", "").fillna("").astype(str).str.strip()
+    merged["is_different"] = qa != qb
 
     # Keep columns consistent and useful
     out_cols = [
@@ -646,7 +823,19 @@ def build_column_attr_diff_tab(
     df = metadata.copy()
     df = df[df["column_name"].notna() & df["table_name"].notna()]
 
-    for c in ["model", "database", "dataset_id", "schemaName", "table_id", "table_name", "column_id", "column_name", attr]:
+    for c in [
+        "model",
+        "database",
+        "dataset_id",
+        "schemaName",
+        "table_id",
+        "table_name",
+        "column_id",
+        "column_name",
+        "column_origin",
+        "originalDataTypeGroup",
+        attr,
+    ]:
         if c not in df.columns:
             df[c] = ""
         df[c] = df[c].fillna("").astype(str)
@@ -694,7 +883,14 @@ def build_column_attr_diff_tab(
         merged["val_a_norm"] = merged["val_a"].apply(_norm_hidden)
         merged["val_b_norm"] = merged["val_b"].apply(_norm_hidden)
     elif attr == "dataTypeGroup":
-        df["_attr_norm"] = df[attr].astype(str).str.strip().str.lower()
+        def _normalized_datatype_for_compare(row: pd.Series) -> str:
+            # Ignore physical-column datatype casts when the underlying source type is unchanged.
+            original_group = str(row.get("originalDataTypeGroup") or "").strip().lower()
+            effective_group = str(row.get(attr) or "").strip().lower()
+            column_origin = str(row.get("column_origin") or "").strip().lower()
+            return original_group if column_origin == "physical" and original_group else effective_group
+
+        df["_attr_norm"] = df.apply(_normalized_datatype_for_compare, axis=1)
         attr_sets_a = (
             df[df["model"] == model_a]
             .groupby(key, dropna=False)["_attr_norm"]
@@ -751,6 +947,12 @@ def build_column_attr_diff_tab(
             )
             .reset_index()
         )
+        hidden_sets_a = (
+            df[(df["model"] == model_a) & (df["_attr_norm"] == "true")]
+            .groupby(["_table_name_key"], dropna=False)
+            .agg(hidden_names_in_model_a=("column_name", lambda s: sorted({str(value) for value in s if str(value).strip() != ""})))
+            .reset_index()
+        )
         hidden_totals_b = (
             df[df["model"] == model_b]
             .groupby(["_table_name_key"], dropna=False)
@@ -764,11 +966,19 @@ def build_column_attr_diff_tab(
             )
             .reset_index()
         )
+        hidden_sets_b = (
+            df[(df["model"] == model_b) & (df["_attr_norm"] == "true")]
+            .groupby(["_table_name_key"], dropna=False)
+            .agg(hidden_names_in_model_b=("column_name", lambda s: sorted({str(value) for value in s if str(value).strip() != ""})))
+            .reset_index()
+        )
         hidden_totals = hidden_totals_a.merge(
             hidden_totals_b,
             on=["_table_name_key"],
             how="outer",
         )
+        hidden_totals = hidden_totals.merge(hidden_sets_a, on=["_table_name_key"], how="left")
+        hidden_totals = hidden_totals.merge(hidden_sets_b, on=["_table_name_key"], how="left")
         hidden_totals["database"] = hidden_totals["database"].where(
             hidden_totals.get("database", "").fillna("").astype(str).str.strip() != "",
             hidden_totals.get("database_b", ""),
@@ -793,6 +1003,24 @@ def build_column_attr_diff_tab(
         hidden_totals["hidden_total_in_model_b"] = hidden_totals["hidden_total_in_model_b"].fillna(0).astype(int)
         hidden_totals[f"hidden_total_diff_{model_b}_minus_{model_a}"] = (
             hidden_totals["hidden_total_in_model_b"] - hidden_totals["hidden_total_in_model_a"]
+        )
+        hidden_totals["hidden_names_in_model_a"] = hidden_totals["hidden_names_in_model_a"].apply(
+            lambda value: value if isinstance(value, list) else []
+        )
+        hidden_totals["hidden_names_in_model_b"] = hidden_totals["hidden_names_in_model_b"].apply(
+            lambda value: value if isinstance(value, list) else []
+        )
+        hidden_totals["hidden_only_in_model_a"] = hidden_totals.apply(
+            lambda row: sorted(set(row["hidden_names_in_model_a"]) - set(row["hidden_names_in_model_b"])),
+            axis=1,
+        )
+        hidden_totals["hidden_only_in_model_b"] = hidden_totals.apply(
+            lambda row: sorted(set(row["hidden_names_in_model_b"]) - set(row["hidden_names_in_model_a"])),
+            axis=1,
+        )
+        hidden_totals["hidden_diff_count"] = hidden_totals.apply(
+            lambda row: len(row["hidden_only_in_model_a"]) + len(row["hidden_only_in_model_b"]),
+            axis=1,
         )
         hidden_totals["database_hidden"] = hidden_totals["database"].where(
             hidden_totals["database"].fillna("").astype(str).str.strip() != "",
@@ -826,6 +1054,9 @@ def build_column_attr_diff_tab(
                     "hidden_total_in_model_a",
                     "hidden_total_in_model_b",
                     f"hidden_total_diff_{model_b}_minus_{model_a}",
+                    "hidden_diff_count",
+                    "hidden_only_in_model_a",
+                    "hidden_only_in_model_b",
                 ]
             ],
             on=["_table_name_key"],
@@ -848,6 +1079,18 @@ def build_column_attr_diff_tab(
                 )
                 per_table = per_table.drop(columns=[fallback])
             per_table[column] = per_table[column].fillna("")
+        if "hidden_diff_count" in per_table.columns:
+            per_table["diff_count"] = per_table["hidden_diff_count"].fillna(per_table["diff_count"]).fillna(0).astype(int)
+        if "hidden_only_in_model_a" in per_table.columns:
+            per_table["column_names_in_model_a"] = per_table["hidden_only_in_model_a"].where(
+                per_table["hidden_only_in_model_a"].apply(lambda value: isinstance(value, list)),
+                per_table["column_names_in_model_a"],
+            )
+        if "hidden_only_in_model_b" in per_table.columns:
+            per_table["column_names_in_model_b"] = per_table["hidden_only_in_model_b"].where(
+                per_table["hidden_only_in_model_b"].apply(lambda value: isinstance(value, list)),
+                per_table["column_names_in_model_b"],
+            )
         for c in ["hidden_total_in_model_a", "hidden_total_in_model_b", f"hidden_total_diff_{model_b}_minus_{model_a}"]:
             if c not in per_table.columns:
                 per_table[c] = 0
@@ -1195,6 +1438,9 @@ def main() -> None:
     meta_a = extract_metadata(model_a, source_file=model_a_label, model_name=model_a_name)
     meta_b = extract_metadata(model_b, source_file=model_b_label, model_name=model_b_name)
     metadata_all = pd.concat([meta_a, meta_b], ignore_index=True)
+    field_inventory_a = extract_table_field_inventory(model_a, model_a_name)
+    field_inventory_b = extract_table_field_inventory(model_b, model_b_name)
+    field_inventory_all = pd.concat([field_inventory_a, field_inventory_b], ignore_index=True)
 
     joins_a = extract_joins(model_a, source_file=model_a_label)
     joins_b = extract_joins(model_b, source_file=model_b_label)
@@ -1202,6 +1448,13 @@ def main() -> None:
 
     # Existing summaries (updated COLUMN_SUMMARY identity)
     column_summary = build_column_summary_by_names(metadata_all)
+    field_count_summary = build_field_count_summary(field_inventory_all)
+    column_summary = merge_field_counts_into_column_summary(
+        column_summary,
+        field_count_summary,
+        model_a_name,
+        model_b_name,
+    )
     join_summary = build_join_summary(joins_all, model_a_label=model_a_label, model_b_label=model_b_label)
 
     # New summary tabs

@@ -56,6 +56,14 @@ interface PythonSmodelColumnAttrDiffRow {
   [key: string]: unknown;
 }
 
+interface PythonSmodelCustomFieldRow {
+  dataset_id?: string | null;
+  schemaName?: string | null;
+  table_id?: string | null;
+  table_name?: string | null;
+  [key: string]: unknown;
+}
+
 interface SmodelColumnRow {
   key: string;
   datasetId: string;
@@ -99,8 +107,14 @@ interface SmodelCompareRow {
   columnCountModelA: number;
   columnCountModelB: number;
   columnCountDiff: number;
-  extraColumnsInModelA: number;
-  extraColumnsInModelB: number;
+  fieldCountWithoutCustomModelA: number;
+  fieldCountWithoutCustomModelB: number;
+  customFieldCountModelA: number;
+  customFieldCountModelB: number;
+  availableFieldCountModelA: number;
+  availableFieldCountModelB: number;
+  droppedFieldCountModelA: number;
+  droppedFieldCountModelB: number;
   joinCountModelA: number;
   joinCountModelB: number;
   joinCountDiff: number;
@@ -108,7 +122,6 @@ interface SmodelCompareRow {
   hiddenTotalModelB: number;
   hiddenTotalDiff: number;
   tableQueryDiff: boolean;
-  customTableDiff: boolean;
   hiddenDiffCount: number;
   datatypeDiffCount: number;
   mismatchFields: string[];
@@ -123,6 +136,7 @@ interface PythonSmodelSheets {
   JOIN_SUMMARY?: PythonSmodelJoinSummaryRow[];
   TABLE_QUERIES?: PythonSmodelQueryDiffRow[];
   CUSTOM_TABLES?: PythonSmodelQueryDiffRow[];
+  CUSTOM_FIELDS?: PythonSmodelCustomFieldRow[];
   HIDDEN_COLUMNS?: PythonSmodelColumnAttrDiffRow[];
   DATATYPES?: PythonSmodelColumnAttrDiffRow[];
 }
@@ -131,8 +145,14 @@ interface SmodelTableSummary {
   columnCountModelA: number;
   columnCountModelB: number;
   columnCountDiff: number;
-  extraColumnsInModelA: number;
-  extraColumnsInModelB: number;
+  fieldCountWithoutCustomModelA: number;
+  fieldCountWithoutCustomModelB: number;
+  customFieldCountModelA: number;
+  customFieldCountModelB: number;
+  availableFieldCountModelA: number;
+  availableFieldCountModelB: number;
+  droppedFieldCountModelA: number;
+  droppedFieldCountModelB: number;
   joinCountModelA: number;
   joinCountModelB: number;
   joinCountDiff: number;
@@ -146,7 +166,6 @@ interface SmodelTableSummary {
   leftTableQuery: string;
   rightTableQuery: string;
   tableQueryDiff: boolean;
-  customTableDiff: boolean;
   hiddenDiffCount: number;
   datatypeDiffCount: number;
 }
@@ -219,24 +238,12 @@ const formatMismatchFieldLabel = (value: string) => {
   switch (value) {
     case 'table_type':
       return 'Table Type';
-    case 'table_expression':
-      return 'Table Expression';
-    case 'dataset_importQuery':
-      return 'Dataset Import Query';
-    case 'table_query':
-      return 'Table Query';
     case 'column_count':
-      return 'Column Count';
-    case 'extra_cols_model_a':
-      return 'Extra Columns In Model A';
-    case 'extra_cols_model_b':
-      return 'Extra Columns In Model B';
+      return 'Total Field Count';
     case 'join_count':
       return 'Join Count';
     case 'table_query_diff':
       return 'Query Difference';
-    case 'custom_table_diff':
-      return 'Custom Table Query Difference';
     case 'hidden_diff_total':
       return 'Hidden Column Differences';
     case 'hidden_total_diff':
@@ -263,8 +270,14 @@ const buildSmodelTableSummaries = (
       columnCountModelA: 0,
       columnCountModelB: 0,
       columnCountDiff: 0,
-      extraColumnsInModelA: 0,
-      extraColumnsInModelB: 0,
+      fieldCountWithoutCustomModelA: 0,
+      fieldCountWithoutCustomModelB: 0,
+      customFieldCountModelA: 0,
+      customFieldCountModelB: 0,
+      availableFieldCountModelA: 0,
+      availableFieldCountModelB: 0,
+      droppedFieldCountModelA: 0,
+      droppedFieldCountModelB: 0,
       joinCountModelA: 0,
       joinCountModelB: 0,
       joinCountDiff: 0,
@@ -278,7 +291,6 @@ const buildSmodelTableSummaries = (
       leftTableQuery: '',
       rightTableQuery: '',
       tableQueryDiff: false,
-      customTableDiff: false,
       hiddenDiffCount: 0,
       datatypeDiffCount: 0,
     };
@@ -292,16 +304,35 @@ const buildSmodelTableSummaries = (
     summary.columnCountModelA = getNumberField(row as Record<string, unknown>, `column_count_in_${modelAName}`);
     summary.columnCountModelB = getNumberField(row as Record<string, unknown>, `column_count_in_${modelBName}`);
     summary.columnCountDiff = getNumberField(row as Record<string, unknown>, `column_count_diff_${modelBName}_minus_${modelAName}`);
-    summary.extraColumnsInModelA = getNumberField(row as Record<string, unknown>, `unique_cols_in_${modelAName}`);
-    summary.extraColumnsInModelB = getNumberField(row as Record<string, unknown>, `unique_cols_in_${modelBName}`);
+    summary.fieldCountWithoutCustomModelA = getNumberField(row as Record<string, unknown>, `field_count_without_custom_in_${modelAName}`);
+    summary.fieldCountWithoutCustomModelB = getNumberField(row as Record<string, unknown>, `field_count_without_custom_in_${modelBName}`);
+    summary.customFieldCountModelA = getNumberField(row as Record<string, unknown>, `custom_field_count_in_${modelAName}`);
+    summary.customFieldCountModelB = getNumberField(row as Record<string, unknown>, `custom_field_count_in_${modelBName}`);
+    summary.availableFieldCountModelA = getNumberField(row as Record<string, unknown>, `available_field_count_in_${modelAName}`);
+    summary.availableFieldCountModelB = getNumberField(row as Record<string, unknown>, `available_field_count_in_${modelBName}`);
+    summary.droppedFieldCountModelA = getNumberField(row as Record<string, unknown>, `dropped_field_count_in_${modelAName}`);
+    summary.droppedFieldCountModelB = getNumberField(row as Record<string, unknown>, `dropped_field_count_in_${modelBName}`);
   }
 
   for (const row of sheets.JOIN_SUMMARY ?? []) {
     const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
-    summary.joinCountModelA = getNumberField(row as Record<string, unknown>, leftSourceLabel);
-    summary.joinCountModelB = getNumberField(row as Record<string, unknown>, rightSourceLabel);
-    summary.joinCountDiff = getNumberField(row as Record<string, unknown>, `diff_${rightSourceLabel}_minus_${leftSourceLabel}`);
+    const relationGroupsFieldA = `relation_groups_in_${leftSourceLabel}`;
+    const relationGroupsFieldB = `relation_groups_in_${rightSourceLabel}`;
+    const relationGroupDiffField = `relation_group_diff_${rightSourceLabel}_minus_${leftSourceLabel}`;
+    const hasRelationGroupA = Object.prototype.hasOwnProperty.call(row, relationGroupsFieldA);
+    const hasRelationGroupB = Object.prototype.hasOwnProperty.call(row, relationGroupsFieldB);
+    const hasRelationGroupDiff = Object.prototype.hasOwnProperty.call(row, relationGroupDiffField);
+
+    summary.joinCountModelA = hasRelationGroupA
+      ? getNumberField(row as Record<string, unknown>, relationGroupsFieldA)
+      : getNumberField(row as Record<string, unknown>, leftSourceLabel);
+    summary.joinCountModelB = hasRelationGroupB
+      ? getNumberField(row as Record<string, unknown>, relationGroupsFieldB)
+      : getNumberField(row as Record<string, unknown>, rightSourceLabel);
+    summary.joinCountDiff = hasRelationGroupDiff
+      ? getNumberField(row as Record<string, unknown>, relationGroupDiffField)
+      : getNumberField(row as Record<string, unknown>, `diff_${rightSourceLabel}_minus_${leftSourceLabel}`);
   }
 
   for (const row of sheets.TABLE_QUERIES ?? []) {
@@ -319,7 +350,7 @@ const buildSmodelTableSummaries = (
   for (const row of sheets.CUSTOM_TABLES ?? []) {
     const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
-    summary.customTableDiff = getBooleanField(row.is_different);
+    summary.tableQueryDiff = summary.tableQueryDiff || getBooleanField(row.is_different);
     summary.leftTableQuery =
       getFirstMatchingFieldText(row as Record<string, unknown>, [`table_query_in_${modelAName}`, 'table_query_in_model_a']) ||
       summary.leftTableQuery;
@@ -404,16 +435,18 @@ const buildSmodelCompareRows = (
     const datatypeSummary = summarizeColumnFieldDiffs(leftRowsForTable, rightRowsForTable, (row) => row.dataType ?? '');
     const hiddenSummary = summarizeColumnFieldDiffs(leftRowsForTable, rightRowsForTable, (row) => row.hidden ?? '');
     const mismatchFields: string[] = [];
+    const leftTableQuery = summary?.leftTableQuery || left?.tableQuery || '';
+    const rightTableQuery = summary?.rightTableQuery || right?.tableQuery || '';
+    const hasQueryDifference =
+      Boolean(summary?.tableQueryDiff) ||
+      leftTableQuery !== rightTableQuery ||
+      (left?.tableExpression ?? '') !== (right?.tableExpression ?? '') ||
+      (left?.datasetImportQuery ?? '') !== (right?.datasetImportQuery ?? '');
+
     if ((left?.tableType ?? '') !== (right?.tableType ?? '')) mismatchFields.push('table_type');
-    if ((left?.tableExpression ?? '') !== (right?.tableExpression ?? '')) mismatchFields.push('table_expression');
-    if ((left?.datasetImportQuery ?? '') !== (right?.datasetImportQuery ?? '')) mismatchFields.push('dataset_importQuery');
-    if ((left?.tableQuery ?? '') !== (right?.tableQuery ?? '')) mismatchFields.push('table_query');
+    if (hasQueryDifference) mismatchFields.push('table_query_diff');
     if ((summary?.columnCountDiff ?? 0) !== 0) mismatchFields.push('column_count');
-    if ((summary?.extraColumnsInModelA ?? 0) !== 0) mismatchFields.push('extra_cols_model_a');
-    if ((summary?.extraColumnsInModelB ?? 0) !== 0) mismatchFields.push('extra_cols_model_b');
     if ((summary?.joinCountDiff ?? 0) !== 0) mismatchFields.push('join_count');
-    if (summary?.tableQueryDiff) mismatchFields.push('table_query_diff');
-    if (summary?.customTableDiff) mismatchFields.push('custom_table_diff');
     if ((summary?.hiddenDiffCount ?? 0) !== 0) mismatchFields.push('hidden_diff_total');
     if ((summary?.hiddenTotalDiff ?? 0) !== 0) mismatchFields.push('hidden_total_diff');
     if ((summary?.datatypeDiffCount ?? 0) !== 0) mismatchFields.push('datatype_diff_total');
@@ -435,21 +468,26 @@ const buildSmodelCompareRows = (
       rightHidden: summary?.hiddenDiffSummaryModelB || hiddenSummary.rightSummary,
       leftDatasetImportQuery: left?.datasetImportQuery ?? '',
       rightDatasetImportQuery: right?.datasetImportQuery ?? '',
-      leftTableQuery: summary?.leftTableQuery || left?.tableQuery || '',
-      rightTableQuery: summary?.rightTableQuery || right?.tableQuery || '',
+      leftTableQuery,
+      rightTableQuery,
       columnCountModelA: summary?.columnCountModelA ?? 0,
       columnCountModelB: summary?.columnCountModelB ?? 0,
       columnCountDiff: summary?.columnCountDiff ?? 0,
-      extraColumnsInModelA: summary?.extraColumnsInModelA ?? 0,
-      extraColumnsInModelB: summary?.extraColumnsInModelB ?? 0,
+      fieldCountWithoutCustomModelA: summary?.fieldCountWithoutCustomModelA ?? 0,
+      fieldCountWithoutCustomModelB: summary?.fieldCountWithoutCustomModelB ?? 0,
+      customFieldCountModelA: summary?.customFieldCountModelA ?? 0,
+      customFieldCountModelB: summary?.customFieldCountModelB ?? 0,
+      availableFieldCountModelA: summary?.availableFieldCountModelA ?? 0,
+      availableFieldCountModelB: summary?.availableFieldCountModelB ?? 0,
+      droppedFieldCountModelA: summary?.droppedFieldCountModelA ?? 0,
+      droppedFieldCountModelB: summary?.droppedFieldCountModelB ?? 0,
       joinCountModelA: summary?.joinCountModelA ?? 0,
       joinCountModelB: summary?.joinCountModelB ?? 0,
       joinCountDiff: summary?.joinCountDiff ?? 0,
       hiddenTotalModelA: summary?.hiddenTotalModelA ?? 0,
       hiddenTotalModelB: summary?.hiddenTotalModelB ?? 0,
       hiddenTotalDiff: summary?.hiddenTotalDiff ?? 0,
-      tableQueryDiff: summary?.tableQueryDiff ?? false,
-      customTableDiff: summary?.customTableDiff ?? false,
+      tableQueryDiff: hasQueryDifference,
       hiddenDiffCount: summary?.hiddenDiffCount ?? 0,
       datatypeDiffCount: summary?.datatypeDiffCount ?? 0,
       mismatchFields,
@@ -515,7 +553,7 @@ export default function SmodelCompareWorkspace() {
         : smodelFilter === 'match'
           ? row.status === 'MATCH'
           : smodelFilter === 'query'
-            ? row.tableQueryDiff || row.customTableDiff || row.mismatchFields.includes('table_query') || row.mismatchFields.includes('table_expression')
+            ? row.tableQueryDiff
             : row.status !== 'MATCH'
     )
     .filter((row) => {
@@ -535,8 +573,8 @@ export default function SmodelCompareWorkspace() {
     null;
 
   const exportSmodelComparisonWorkbook = () => {
-    const headers = ['Status', 'Table', 'Mismatch Fields', 'Col Count Model A', 'Col Count Model B', 'Col Count Diff', 'Extra Cols Model A', 'Extra Cols Model B', 'Join Count Model A', 'Join Count Model B', 'Join Diff', 'Hidden Total Model A', 'Hidden Total Model B', 'Hidden Total Diff', 'Table Query Diff', 'Custom Table Diff', 'Hidden Diff Total', 'Datatype Diff Total', 'Dataset ID', 'Dataset', 'Schema', 'Table ID', `${smodelModelALabel} Table Type`, `${smodelModelBLabel} Table Type`, `${smodelModelALabel} Table Expression`, `${smodelModelBLabel} Table Expression`, `${smodelModelALabel} Dataset Import Query`, `${smodelModelBLabel} Dataset Import Query`, `${smodelModelALabel} Table Query`, `${smodelModelBLabel} Table Query`];
-    const rows = visibleSmodelRows.map((row) => [row.status, row.tableName, row.mismatchFields.join(', '), row.columnCountModelA, row.columnCountModelB, row.columnCountDiff, row.extraColumnsInModelA, row.extraColumnsInModelB, row.joinCountModelA, row.joinCountModelB, row.joinCountDiff, row.hiddenTotalModelA, row.hiddenTotalModelB, row.hiddenTotalDiff, row.tableQueryDiff ? 'Yes' : 'No', row.customTableDiff ? 'Yes' : 'No', row.hiddenDiffCount, row.datatypeDiffCount, row.datasetId, row.datasetName, row.schemaName, row.tableId, row.leftTableType, row.rightTableType, row.leftTableExpression, row.rightTableExpression, row.leftDatasetImportQuery, row.rightDatasetImportQuery, row.leftTableQuery, row.rightTableQuery]);
+    const headers = ['Status', 'Table', 'Mismatch Fields', 'Total Field Count Model A', 'Total Field Count Model B', 'Total Field Count Diff', 'Field Count Without Custom Model A', 'Field Count Without Custom Model B', 'Custom Field Count Model A', 'Custom Field Count Model B', 'Available Field Count Model A', 'Available Field Count Model B', 'Dropped Field Count Model A', 'Dropped Field Count Model B', 'Join Count Model A', 'Join Count Model B', 'Join Diff', 'Hidden Total Model A', 'Hidden Total Model B', 'Hidden Total Diff', 'Table Query Diff', 'Datatype Diff Total', 'Dataset ID', 'Dataset', 'Schema', 'Table ID', `${smodelModelALabel} Table Type`, `${smodelModelBLabel} Table Type`, `${smodelModelALabel} Table Expression`, `${smodelModelBLabel} Table Expression`, `${smodelModelALabel} Dataset Import Query`, `${smodelModelBLabel} Dataset Import Query`, `${smodelModelALabel} Table Query`, `${smodelModelBLabel} Table Query`];
+    const rows = visibleSmodelRows.map((row) => [row.status, row.tableName, row.mismatchFields.join(', '), row.columnCountModelA, row.columnCountModelB, row.columnCountDiff, row.fieldCountWithoutCustomModelA, row.fieldCountWithoutCustomModelB, row.customFieldCountModelA, row.customFieldCountModelB, row.availableFieldCountModelA, row.availableFieldCountModelB, row.droppedFieldCountModelA, row.droppedFieldCountModelB, row.joinCountModelA, row.joinCountModelB, row.joinCountDiff, row.hiddenTotalModelA, row.hiddenTotalModelB, row.hiddenTotalDiff, row.tableQueryDiff ? 'Yes' : 'No', row.datatypeDiffCount, row.datasetId, row.datasetName, row.schemaName, row.tableId, row.leftTableType, row.rightTableType, row.leftTableExpression, row.rightTableExpression, row.leftDatasetImportQuery, row.rightDatasetImportQuery, row.leftTableQuery, row.rightTableQuery]);
     const workbookXml = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Smodel Compare"><Table><Row>${headers.map((header) => `<Cell><Data ss:Type="String">${escapeXml(header)}</Data></Cell>`).join('')}</Row>${rows.map((row) => `<Row>${row.map((value) => `<Cell><Data ss:Type="String">${escapeXml(value)}</Data></Cell>`).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;
     const blob = new Blob([workbookXml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -655,11 +693,11 @@ export default function SmodelCompareWorkspace() {
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-600">Smodel Side-By-Side</p>
                 <h3 className="mt-1 text-xl font-black tracking-tight">Model A vs Model B table comparison</h3>
-                <p className="mt-1 text-sm text-slate-500">Grouped by table name. Shows table-level counts, joins, queries, hidden flags, and datatype differences.</p>
+                <p className="mt-1 text-sm text-slate-500">Grouped by table name. Shows field counts, joins, query differences, hidden totals, and datatype differences.</p>
               </div>
               <div className="grid gap-2 text-xs font-bold">
                 <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">Tables: {smodelRows.length}</span>
-                <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-emerald-700">Matches: {smodelRows.filter((row) => row.status === 'MATCH').length}</span>
+                <span className="rounded-full bg-blue-100 px-3 py-1.5 text-blue-700">Query Changes: {smodelRows.filter((row) => row.tableQueryDiff).length}</span>
                 <span className="rounded-full bg-rose-100 px-3 py-1.5 text-rose-700">Mismatches: {smodelRows.filter((row) => row.status === 'MISMATCH').length}</span>
               </div>
             </div>
@@ -691,11 +729,17 @@ export default function SmodelCompareWorkspace() {
                   <th className="border border-slate-800 px-3 py-2 font-bold">Status</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Table</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Mismatch Fields</th>
-                  <th className="border border-slate-800 px-3 py-2 font-bold">Col Count Model A</th>
-                  <th className="border border-slate-800 px-3 py-2 font-bold">Col Count Model B</th>
-                  <th className="border border-slate-800 px-3 py-2 font-bold">Col Count Diff</th>
-                  <th className="border border-slate-800 px-3 py-2 font-bold">Extra Cols Model A</th>
-                  <th className="border border-slate-800 px-3 py-2 font-bold">Extra Cols Model B</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Total Field Count Model A</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Total Field Count Model B</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Total Field Count Diff</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Field Count Without Custom Model A</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Field Count Without Custom Model B</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Custom Field Count Model A</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Custom Field Count Model B</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Available Field Count Model A</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Available Field Count Model B</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Dropped Field Count Model A</th>
+                  <th className="border border-slate-800 px-3 py-2 font-bold">Dropped Field Count Model B</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Join Count Model A</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Join Count Model B</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Join Diff</th>
@@ -703,8 +747,6 @@ export default function SmodelCompareWorkspace() {
                   <th className="border border-slate-800 px-3 py-2 font-bold">Hidden Total Model B</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Hidden Total Diff</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Table Query Diff</th>
-                  <th className="border border-slate-800 px-3 py-2 font-bold">Custom Table Diff</th>
-                  <th className="border border-slate-800 px-3 py-2 font-bold">Hidden Diff Total</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Datatype Diff Total</th>
                   <th className="border border-slate-800 px-3 py-2 font-bold">Inspect</th>
                 </tr>
@@ -718,8 +760,14 @@ export default function SmodelCompareWorkspace() {
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnCountModelA}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnCountModelB}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.columnCountDiff}</td>
-                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.extraColumnsInModelA}</td>
-                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.extraColumnsInModelB}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.fieldCountWithoutCustomModelA}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.fieldCountWithoutCustomModelB}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.customFieldCountModelA}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.customFieldCountModelB}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.availableFieldCountModelA}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.availableFieldCountModelB}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.droppedFieldCountModelA}</td>
+                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.droppedFieldCountModelB}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.joinCountModelA}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.joinCountModelB}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.joinCountDiff}</td>
@@ -727,8 +775,6 @@ export default function SmodelCompareWorkspace() {
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.hiddenTotalModelB}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.hiddenTotalDiff}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.tableQueryDiff ? 'Yes' : 'No'}</td>
-                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.customTableDiff ? 'Yes' : 'No'}</td>
-                    <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.hiddenDiffCount}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.datatypeDiffCount}</td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">
                       <button
@@ -745,7 +791,7 @@ export default function SmodelCompareWorkspace() {
                     </td>
                   </tr>
                 ))}
-                {visibleSmodelRows.length === 0 ? <tr><td colSpan={19} className="border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No tables found for the selected filter.</td></tr> : null}
+                {visibleSmodelRows.length === 0 ? <tr><td colSpan={23} className="border border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No tables found for the selected filter.</td></tr> : null}
               </tbody>
             </table>
           </div>
@@ -759,7 +805,7 @@ export default function SmodelCompareWorkspace() {
                   <p className="mt-1 text-sm text-slate-500">Actual query text from both models for easier visual comparison. Query text is typically available for custom or query-backed tables. If metadata query fields are blank, the preview falls back to the Python compare query tabs.</p>
                 </div>
                 <div className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm">
-                  {selectedQueryPreviewRow.tableQueryDiff || selectedQueryPreviewRow.customTableDiff ? 'Query mismatch detected' : 'Queries match'}
+                  {selectedQueryPreviewRow.tableQueryDiff ? 'Query mismatch detected' : 'Queries match'}
                 </div>
               </div>
 
