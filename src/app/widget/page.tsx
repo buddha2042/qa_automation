@@ -58,7 +58,23 @@ const isLeafValue = (val: unknown) =>
   (Array.isArray(val) && val.length === 0) ||
   (typeof val === 'object' && val !== null && Object.keys(val).length === 0);
 
-const IGNORED_COMPARE_PATHS = new Set(['style.content.html']);
+const IGNORED_COMPARE_PATHS = new Set([
+  'style.content.html',
+  'datasource.fullname',
+  'query.datasource.fullname',
+]);
+const IGNORED_COMPARE_PATH_PATTERNS = [
+  /^query\.metadata\.\d+\.jaql\.datasource\.(database|title|fullname|id)$/,
+  /^query\.metadata\.\d+\.jaql\.context\.\[[^\]]+\]\.datasource\.(database|title|fullname|id)$/,
+  /^panels\.\d+\.items\.\d+\.jaql\.datasource\.(database|title|fullname|id)$/,
+  /^panels\.\d+\.items\.\d+\.jaql\.context\.\[[^\]]+\]\.datasource\.(database|title|fullname|id)$/,
+];
+
+const shouldIgnoreComparePath = (path: string): boolean =>
+  IGNORED_COMPARE_PATHS.has(path) ||
+  IGNORED_COMPARE_PATH_PATTERNS.some((pattern) => pattern.test(path));
+
+const DEFAULT_PREVIEW_ROW_LIMIT = 10000;
 
 const isValidHttpUrl = (value: string) => {
   try {
@@ -123,7 +139,7 @@ const prepareJaqlBody = (widgetJson: WidgetPayloadTyped): PreviewQueryBody | nul
 
   return {
     datasource: fallbackDatasource ? { fullname: fallbackDatasource } : widgetJson.datasource,
-    count: widgetJson.query?.count ?? 1000,
+    count: widgetJson.query?.count ?? DEFAULT_PREVIEW_ROW_LIMIT,
     metadata,
   };
 };
@@ -385,7 +401,7 @@ export default function WidgetComparePage() {
     obj2: JsonValue | undefined,
     path = ''
   ): ComparisonItem[] => {
-    if (path && IGNORED_COMPARE_PATHS.has(path)) {
+    if (path && shouldIgnoreComparePath(path)) {
       return [];
     }
 
@@ -563,7 +579,7 @@ export default function WidgetComparePage() {
           datasource: datasourceFullname,
           jaql: {
             ...jaqlBody,
-            count: jaqlBody.count ?? 1000,
+            count: jaqlBody.count ?? DEFAULT_PREVIEW_ROW_LIMIT,
           },
         }),
       });

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { normalizeBaseUrl } from '@/lib/network';
 import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
+const DEFAULT_PREVIEW_ROW_LIMIT = 10000;
+
 interface JaqlMetadataItem {
   panel?: string;
   disabled?: boolean;
@@ -86,7 +88,7 @@ export async function POST(req: Request) {
 
     const jaqlPayload: JaqlPayload = {
       datasource: jaql.datasource ? { ...jaql.datasource } : undefined,
-      count: typeof jaql.count === 'number' ? jaql.count : 1000,
+      count: typeof jaql.count === 'number' ? jaql.count : DEFAULT_PREVIEW_ROW_LIMIT,
       metadata: Array.isArray(jaql.metadata) ? [...jaql.metadata] : [],
     };
 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { normalizeBaseUrl } from '@/lib/network';
 import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
+const DEFAULT_PREVIEW_ROW_LIMIT = 10000;
+
 interface WidgetPayload {
   datasource?: { fullname?: string };
   query?: {
@@ -69,7 +71,7 @@ export async function POST(req: Request) {
     const jaqlBody = {
       datasource: normalizeDatasourceForBody(datasourceFullname),
       metadata,
-      count: widgetPayload.query?.count ?? 1000,
+      count: widgetPayload.query?.count ?? DEFAULT_PREVIEW_ROW_LIMIT,
     };
 
     const response = await fetch(
