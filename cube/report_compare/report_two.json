@@ -1,0 +1,2029 @@
+{
+  "title": "CBU-1803-Claimant_VEH_BI_Case_Eval_LT_25k_03182019_DXC",
+  "desc": "",
+  "source": null,
+  "type": "dashboard",
+  "style": {
+    "palette": {
+      "name": "Vivid",
+      "colors": [
+        "#00cee6",
+        "#9b9bd7",
+        "#6EDA55",
+        "#fc7570",
+        "#fbb755",
+        "#218A8C"
+      ]
+    }
+  },
+  "layout": {
+    "instanceid": "568C1-151B-0E",
+    "type": "columnar",
+    "columns": [
+      {
+        "width": 100,
+        "cells": [
+          {
+            "subcells": [
+              {
+                "elements": [
+                  {
+                    "minHeight": 128,
+                    "maxHeight": 2048,
+                    "minWidth": 128,
+                    "maxWidth": 2048,
+                    "defaultWidth": 512,
+                    "widgetid": "69bdb5c546a4e4003364528c",
+                    "height": "792px",
+                    "autoHeight": "792px"
+                  }
+                ],
+                "width": 100,
+                "stretchable": false,
+                "pxlWidth": 1583,
+                "index": 0
+              }
+            ]
+          }
+        ],
+        "pxlWidth": 1583,
+        "index": 0
+      }
+    ],
+    "container": {
+      "sizzle1774047734332": {
+        "undefined": {
+          "parentNode": [
+            118.30511378320605,
+            27,
+            true
+          ]
+        }
+      }
+    }
+  },
+  "original": null,
+  "dataExploration": false,
+  "lastOpened": null,
+  "previewLayout": [],
+  "oid": "69bdb5c546a4e4003364528a",
+  "datasource": {
+    "address": "LocalHost",
+    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+    "live": false
+  },
+  "filters": [
+    {
+      "jaql": {
+        "table": "Claim Status History",
+        "column": "Date Status Changed",
+        "dim": "[Claim Status History.Date Status Changed (Calendar)]",
+        "datatype": "datetime",
+        "merged": true,
+        "isDashboardFilter": true,
+        "level": "days",
+        "title": "Days in Date Status Changed",
+        "collapsed": true,
+        "datasource": {
+          "address": "LocalHost",
+          "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+          "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+          "live": false
+        },
+        "filter": {
+          "to": "2026-03-20"
+        }
+      },
+      "instanceid": "16E03-B1C9-38",
+      "isCascading": false,
+      "disabled": false
+    },
+    {
+      "jaql": {
+        "table": "Financial History",
+        "column": "Eval Date",
+        "dim": "[Financial History.Eval Date (Calendar)]",
+        "datatype": "datetime",
+        "merged": true,
+        "isDashboardFilter": true,
+        "level": "days",
+        "title": "Days in Eval Date",
+        "collapsed": true,
+        "datasource": {
+          "address": "LocalHost",
+          "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+          "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+          "live": false
+        },
+        "filter": {
+          "to": "2026-03-20"
+        }
+      },
+      "instanceid": "1A91C-F385-04",
+      "isCascading": false,
+      "disabled": false
+    },
+    {
+      "jaql": {
+        "table": "Region",
+        "column": "Region Last Name",
+        "dim": "[Region.Region Last Name]",
+        "datatype": "text",
+        "merged": true,
+        "isDashboardFilter": true,
+        "collapsed": true,
+        "title": "Region Last Name",
+        "datasource": {
+          "address": "LocalHost",
+          "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+          "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+          "live": false
+        },
+        "filter": {
+          "explicit": true,
+          "multiSelection": true,
+          "members": [
+            "Florida Power & Light"
+          ]
+        }
+      },
+      "instanceid": "FF1DD-4977-85",
+      "isCascading": false,
+      "disabled": false
+    }
+  ],
+  "editing": true,
+  "settings": {
+    "autoUpdateOnFiltersChange": true
+  },
+  "parentFolder": "697cf514e83dfe003358a299",
+  "filterToDatasourceMapping": {},
+  "filterRelations": [],
+  "widgets": [
+    {
+      "title": "CBU-1803-Claimant_VEH_BI_Case_Eval_LT_25k_03182019_DXC_Report1",
+      "type": "pivot2",
+      "subtype": "pivot2",
+      "oid": "69bdb5c546a4e4003364528c",
+      "desc": null,
+      "source": null,
+      "datasource": {
+        "address": "LocalHost",
+        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+        "live": false
+      },
+      "selection": null,
+      "metadata": {
+        "ignore": {
+          "dimensions": [],
+          "ids": [],
+          "all": false
+        },
+        "panels": [
+          {
+            "name": "rows",
+            "items": [
+              {
+                "jaql": {
+                  "table": "Claim Status History",
+                  "column": "FPL Status",
+                  "dim": "[Claim Status History.FPL Status]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "FPL Status"
+                },
+                "instanceid": "FFEEB-BF06-B4",
+                "panel": "rows",
+                "field": {
+                  "id": "[Claim Status History.FPL Status]",
+                  "index": 0
+                },
+                "format": {
+                  "subtotal": true
+                }
+              },
+              {
+                "jaql": {
+                  "table": "Claim",
+                  "column": "Claim Number",
+                  "dim": "[Claim.Claim Number]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Claim Number"
+                },
+                "instanceid": "14E46-9756-9B",
+                "panel": "rows",
+                "field": {
+                  "id": "[Claim.Claim Number]",
+                  "index": 1
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "table": "Region",
+                  "column": "Region Last Name",
+                  "dim": "[Region.Region Last Name]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Region Last Name"
+                },
+                "instanceid": "33A23-B032-E3",
+                "panel": "rows",
+                "field": {
+                  "id": "[Region.Region Last Name]",
+                  "index": 2
+                }
+              },
+              {
+                "jaql": {
+                  "table": "Claim Status History",
+                  "column": "CSH O/C Status Code",
+                  "dim": "[Claim Status History.CSH O/C Status Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "CSH O/C Status Code"
+                },
+                "instanceid": "710EF-20A4-30",
+                "panel": "rows",
+                "field": {
+                  "id": "[Claim Status History.CSH O/C Status Code]",
+                  "index": 3
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "table": "Claim Status History",
+                  "column": "CL_STATUS_ROW_ID",
+                  "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
+                  "datatype": "numeric",
+                  "title": "CL_STATUS_ROW_ID"
+                },
+                "instanceid": "02F1E-7583-F0",
+                "panel": "rows",
+                "field": {
+                  "id": "[Claim Status History.CL_STATUS_ROW_ID]",
+                  "index": 4
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "table": "Claim",
+                  "column": "Claim Status Desc",
+                  "dim": "[Claim.Claim Status Desc]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Claim Status Desc"
+                },
+                "instanceid": "95EF5-5614-F5",
+                "panel": "rows",
+                "field": {
+                  "id": "[Claim.Claim Status Desc]",
+                  "index": 5
+                }
+              }
+            ]
+          },
+          {
+            "name": "values",
+            "items": [
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "case when ([B7178-539] = 0) then 1 else case when\n( ([B7178-539] , [F8B2C-86C]) <25000)   then 1  else 0 end end",
+                  "context": {
+                    "[B7178-539]": {
+                      "table": "Financial History",
+                      "column": "Balance Amount",
+                      "dim": "[Financial History.Balance Amount]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total Balance Amount"
+                    },
+                    "[F8B2C-86C]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": true,
+                        "multiSelection": true,
+                        "members": [
+                          "BI"
+                        ]
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    }
+                  },
+                  "datatype": "numeric",
+                  "title": "Formula"
+                },
+                "instanceid": "ED1FC-B4F8-6F",
+                "panel": "measures",
+                "field": {
+                  "id": "case when [F7C6F-2A3]>10 then 1 else 0 end",
+                  "index": 6
+                },
+                "format": {
+                  "mask": {
+                    "type": "number",
+                    "t": true,
+                    "b": true,
+                    "separated": true,
+                    "decimals": "auto",
+                    "isdefault": true
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": true
+              },
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
+                  "context": {
+                    "[40C79-13D]": {
+                      "table": "Claim Status History",
+                      "column": "CL_STATUS_ROW_ID",
+                      "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
+                      "datatype": "numeric",
+                      "title": "CL_STATUS_ROW_ID"
+                    },
+                    "[991E4-56E]": {
+                      "table": "Claim Status History",
+                      "column": "CLAIM_ID",
+                      "dim": "[Claim Status History.CLAIM_ID]",
+                      "datatype": "numeric",
+                      "title": "CLAIM_ID"
+                    }
+                  },
+                  "datatype": "numeric",
+                  "title": "Formula1"
+                },
+                "instanceid": "F8839-ED1C-62",
+                "panel": "measures",
+                "field": {
+                  "id": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
+                  "index": 7
+                },
+                "format": {
+                  "mask": {
+                    "type": "number",
+                    "t": true,
+                    "b": true,
+                    "separated": true,
+                    "decimals": "auto",
+                    "isdefault": true
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": true
+              },
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "count([52C97-E3E])",
+                  "context": {
+                    "[52C97-E3E]": {
+                      "table": "Claim",
+                      "column": "Claim Number",
+                      "dim": "[Claim.Claim Number]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Claim Number"
+                    }
+                  },
+                  "title": "Claim count",
+                  "datatype": "numeric",
+                  "subtotalAgg": "sum"
+                },
+                "instanceid": "B3907-D8DF-8A",
+                "panel": "measures",
+                "field": {
+                  "id": "count([52C97-E3E])",
+                  "index": 8
+                },
+                "format": {
+                  "mask": {
+                    "type": "number",
+                    "t": true,
+                    "b": true,
+                    "separated": true,
+                    "decimals": "auto",
+                    "isdefault": true
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "case when ([0ABFF-9B9],[4003B-611])>0 then ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[4003B-611])=0then  ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[87ED3-628])=0then  ([0ABFF-9B9],[87ED3-628])\n\nelse [0ABFF-9B9]\nend\nend \nend\n\n\n\n",
+                  "context": {
+                    "[0ABFF-9B9]": {
+                      "table": "Financial History",
+                      "column": "Incurred Amount",
+                      "dim": "[Financial History.Incurred Amount]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total Incurred Amount"
+                    },
+                    "[87ED3-628]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": false,
+                        "multiSelection": true,
+                        "all": true
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    },
+                    "[4003B-611]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": true,
+                        "multiSelection": true,
+                        "members": [
+                          "BI"
+                        ]
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    }
+                  },
+                  "datatype": "numeric",
+                  "subtotalAgg": "sum",
+                  "title": "Incurred Total"
+                },
+                "instanceid": "C2E4B-B6B8-BD",
+                "panel": "measures",
+                "field": {
+                  "id": "[Financial History.Incurred Amount]_sum",
+                  "index": 9
+                },
+                "format": {
+                  "mask": {
+                    "abbreviations": {
+                      "t": false,
+                      "b": false,
+                      "m": false,
+                      "k": false
+                    },
+                    "decimals": 2,
+                    "number": {
+                      "separated": true
+                    },
+                    "abbreviateAll": false
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "case when ([7B487-F2F],[BAA81-5C2])>0 then ([7B487-F2F],[BAA81-5C2])\nelse case when ([7B487-F2F],[BAA81-5C2])=0then  ([7B487-F2F],[BAA81-5C2])\nelse case when ([7B487-F2F],[02E64-7D0])=0then  ([7B487-F2F],[02E64-7D0])\n\nelse [7B487-F2F]\nend\nend \nend\n\n\n          \n           \n  \n\n\n\n",
+                  "context": {
+                    "[02E64-7D0]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": false,
+                        "multiSelection": true,
+                        "all": true
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    },
+                    "[BAA81-5C2]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": true,
+                        "multiSelection": true,
+                        "members": [
+                          "BI"
+                        ]
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    },
+                    "[7B487-F2F]": {
+                      "table": "Financial History",
+                      "column": "Paid Amount",
+                      "dim": "[Financial History.Paid Amount]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total Paid Amount"
+                    }
+                  },
+                  "datatype": "numeric",
+                  "subtotalAgg": "sum",
+                  "title": "Paid Total"
+                },
+                "instanceid": "0CED1-CFFD-BA",
+                "panel": "measures",
+                "field": {
+                  "id": "case when(( [7EEB5-391],[29254-127])>0)then ([7EEB5-391],[29254-127])/count([536CD-CB7])\n\nelse  ([7EEB5-391],[902FC-A44])/count([536CD-CB7]) end\n",
+                  "index": 10
+                },
+                "format": {
+                  "mask": {
+                    "abbreviations": {
+                      "t": false,
+                      "b": false,
+                      "m": false,
+                      "k": false
+                    },
+                    "decimals": 2,
+                    "number": {
+                      "separated": true
+                    },
+                    "abbreviateAll": false
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "\n \n case when ([94E91-A83] = 0) then [94E91-A83] else case when\n( ([94E91-A83] , [47BF5-911]) <25000)   then ([94E91-A83] , [47BF5-911]) end end\n \n \n",
+                  "context": {
+                    "[94E91-A83]": {
+                      "table": "Financial History",
+                      "column": "Balance Amount",
+                      "dim": "[Financial History.Balance Amount]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total Balance Amount"
+                    },
+                    "[47BF5-911]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": true,
+                        "multiSelection": true,
+                        "members": [
+                          "BI"
+                        ]
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    }
+                  },
+                  "datatype": "numeric",
+                  "subtotalAgg": "sum",
+                  "title": "Outstanding Total"
+                },
+                "instanceid": "01F90-85A1-4F",
+                "panel": "measures",
+                "field": {
+                  "id": "[Financial History.Balance Amount]_sum",
+                  "index": 11
+                },
+                "format": {
+                  "mask": {
+                    "abbreviations": {
+                      "t": false,
+                      "b": false,
+                      "m": false,
+                      "k": false
+                    },
+                    "decimals": 2,
+                    "number": {
+                      "separated": true
+                    },
+                    "abbreviateAll": false
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "case when ([0ABFF-9B9],[4003B-611])>0 then ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[4003B-611])=0then  ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[87ED3-628])=0then  ([0ABFF-9B9],[87ED3-628])\n\nelse [0ABFF-9B9]\nend\nend \nend\n\n\n\n",
+                  "context": {
+                    "[0ABFF-9B9]": {
+                      "table": "Financial History",
+                      "column": "Incurred Amount",
+                      "dim": "[Financial History.Incurred Amount]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total Incurred Amount"
+                    },
+                    "[87ED3-628]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": false,
+                        "multiSelection": true,
+                        "all": true
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    },
+                    "[4003B-611]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": true,
+                        "multiSelection": true,
+                        "members": [
+                          "BI"
+                        ]
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    }
+                  },
+                  "datatype": "numeric",
+                  "subtotalAgg": "avg",
+                  "title": "Average Incurred Loss"
+                },
+                "instanceid": "C2E4B-B6B8-BD",
+                "panel": "measures",
+                "field": {
+                  "id": "[Financial History.Incurred Amount]_sum",
+                  "index": 12
+                },
+                "format": {
+                  "mask": {
+                    "abbreviations": {
+                      "t": false,
+                      "b": false,
+                      "m": false,
+                      "k": false
+                    },
+                    "decimals": 2,
+                    "number": {
+                      "separated": true
+                    },
+                    "abbreviateAll": false
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": false
+              }
+            ]
+          },
+          {
+            "name": "columns",
+            "items": []
+          },
+          {
+            "name": "filters",
+            "items": [
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "case when ([B7178-539] = 0) then 1 else case when\n( ([B7178-539] , [F8B2C-86C]) <25000)   then 1  else 0 end end",
+                  "context": {
+                    "[B7178-539]": {
+                      "table": "Financial History",
+                      "column": "Balance Amount",
+                      "dim": "[Financial History.Balance Amount]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total Balance Amount"
+                    },
+                    "[F8B2C-86C]": {
+                      "table": "Reserve Current",
+                      "column": "Reserve Type Code",
+                      "dim": "[Reserve Current.Reserve Type Code]",
+                      "datatype": "text",
+                      "merged": true,
+                      "title": "Reserve Type Code",
+                      "filter": {
+                        "explicit": true,
+                        "multiSelection": true,
+                        "members": [
+                          "BI"
+                        ]
+                      },
+                      "collapsed": true,
+                      "datasource": {
+                        "address": "LocalHost",
+                        "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                        "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                        "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                        "live": false
+                      }
+                    }
+                  },
+                  "title": "Formula",
+                  "datatype": "numeric",
+                  "filter": {
+                    "equals": "1"
+                  },
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  },
+                  "collapsed": false
+                },
+                "instanceid": "A8E59-7E20-84",
+                "panel": "scope",
+                "format": {
+                  "mask": {
+                    "type": "number",
+                    "t": true,
+                    "b": true,
+                    "separated": true,
+                    "decimals": "auto",
+                    "isdefault": true
+                  }
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "table": "Event",
+                  "column": "Event Category Desc",
+                  "dim": "[Event.Event Category Desc]",
+                  "datatype": "text",
+                  "merged": true,
+                  "isDashboardFilter": false,
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "Fleet Accident",
+                      "Non-Fleet Accident"
+                    ]
+                  },
+                  "collapsed": true,
+                  "title": "Event Category Desc",
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "instanceid": "D9CE0-2E41-41",
+                "panel": "scope"
+              },
+              {
+                "jaql": {
+                  "table": "Claim Status History",
+                  "column": "CSH O/C Status Code",
+                  "dim": "[Claim Status History.CSH O/C Status Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "isDashboardFilter": false,
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "O"
+                    ]
+                  },
+                  "collapsed": true,
+                  "title": "CSH O/C Status Code",
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "instanceid": "12D04-5B2A-31",
+                "panel": "scope"
+              },
+              {
+                "jaql": {
+                  "table": "Event",
+                  "column": "Event Type Code",
+                  "dim": "[Event.Event Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "isDashboardFilter": false,
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "VE"
+                    ]
+                  },
+                  "collapsed": true,
+                  "title": "Event Type Code",
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "instanceid": "A770C-BEFF-37",
+                "panel": "scope"
+              },
+              {
+                "jaql": {
+                  "table": "Claim",
+                  "column": "Claim Type Code",
+                  "dim": "[Claim.Claim Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "isDashboardFilter": false,
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "BODI"
+                    ]
+                  },
+                  "collapsed": true,
+                  "title": "Claim Type Code",
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "instanceid": "8E15E-EFCB-7C",
+                "panel": "scope"
+              }
+            ]
+          }
+        ],
+        "usedFormulasMapping": {}
+      },
+      "style": {
+        "scroll": false,
+        "pageSize": 25,
+        "automaticHeight": true,
+        "colors": {
+          "rows": true,
+          "columns": false,
+          "headers": false,
+          "members": false,
+          "totals": false
+        },
+        "narration": {
+          "enabled": false,
+          "display": "above",
+          "format": "bullets",
+          "verbosity": "medium",
+          "up_sentiment": "good",
+          "aggregation": "sum",
+          "labels": [
+            {
+              "id": "fpl_status",
+              "title": "FPL Status",
+              "singular": "FPL Status",
+              "plural": "FPL Status"
+            },
+            {
+              "id": "claim_number",
+              "title": "Claim Number",
+              "singular": "Claim Number",
+              "plural": "Claim Number"
+            },
+            {
+              "id": "region_last_name",
+              "title": "Region Last Name",
+              "singular": "Region Last Name",
+              "plural": "Region Last Name"
+            },
+            {
+              "id": "csh_o/c_status_code",
+              "title": "CSH O/C Status Code",
+              "singular": "CSH O/C Status Code",
+              "plural": "CSH O/C Status Code"
+            },
+            {
+              "id": "cl_status_row_id",
+              "title": "CL_STATUS_ROW_ID",
+              "singular": "CL_STATUS_ROW_ID",
+              "plural": "CL_STATUS_ROW_ID"
+            },
+            {
+              "id": "claim_status_desc",
+              "title": "Claim Status Desc",
+              "singular": "Claim Status Desc",
+              "plural": "Claim Status Desc"
+            },
+            {
+              "id": "event_category_desc",
+              "title": "Event Category Desc",
+              "singular": "Event Category Desc",
+              "plural": "Event Category Desc"
+            },
+            {
+              "id": "event_type_code",
+              "title": "Event Type Code",
+              "singular": "Event Type Code",
+              "plural": "Event Type Code"
+            },
+            {
+              "id": "claim_type_code",
+              "title": "Claim Type Code",
+              "singular": "Claim Type Code",
+              "plural": "Claim Type Code"
+            }
+          ]
+        },
+        "rowsGrandTotal": true,
+        "widgetDesign": {
+          "widgetBackgroundColor": "#FFFFFF",
+          "widgetTitleBackgroundColor": "#1f56d2",
+          "widgetTitleColor": "#ffffff",
+          "widgetTitleAlignment": "left",
+          "widgetBorderEnabled": false,
+          "widgetBorderColor": "#9EA2AB",
+          "widgetCornerRadius": "medium",
+          "widgetShadow": "medium",
+          "widgetSpacing": "medium",
+          "widgetTitleDividerEnabled": false,
+          "widgetTitleDividerColor": "#5B6372"
+        },
+        "jtdExcludedDims": [
+          "[Claim Status History.CSH Status Code]",
+          "[Claim Status History.CSH Status Desc]",
+          "[Claim.Claim Number]",
+          "[Region.Region Last Name]",
+          "[Claim Status History.CSH O/C Status Code]",
+          "[Claim Status History.CL_STATUS_ROW_ID]",
+          "[Reserve Current.Reserve Type Code]",
+          "[Event.Event Category Desc]",
+          "[Event.Event Type Code]",
+          "[Claim.Claim Type Code]",
+          "[Claim Status History.Date Status Changed]",
+          "[Financial History.Eval Date]",
+          "[Claim Status History.Date Record Added]",
+          "[Claim Status History.Reason]",
+          "[Claim.Claim Status Desc]",
+          "[Claim Status History.FPL Status]"
+        ]
+      },
+      "instanceid": "9A5D4-237F-84",
+      "drillToDashboardConfig": {
+        "drilledDashboardPrefix": "_drill",
+        "drilledDashboardsFolderPrefix": "",
+        "displayFilterPane": true,
+        "displayDashboardsPane": true,
+        "displayToolbarRow": true,
+        "displayHeaderRow": true,
+        "volatile": false,
+        "hideDrilledDashboards": true,
+        "hideSharedDashboardsForNonOwner": true,
+        "drillToDashboardMenuCaption": "Jump to dashboard",
+        "drillToDashboardRightMenuCaption": "Jump to ",
+        "drillToDashboardNavigateType": 2,
+        "drillToDashboardNavigateTypePivot": 2,
+        "drillToDashboardNavigateTypeCharts": 1,
+        "drillToDashboardNavigateTypeOthers": 3,
+        "excludeFilterDims": [],
+        "includeFilterDims": [],
+        "drilledDashboardDisplayType": 2,
+        "dashboardIds": [],
+        "modalWindowResize": false,
+        "showFolderNameOnMenuSelection": false,
+        "resetDashFiltersAfterJTD": false,
+        "sameCubeRestriction": true,
+        "showJTDIcon": true,
+        "sendPieChartMeasureFiltersOnClick": true,
+        "forceZeroInsteadNull": false,
+        "mergeTargetDashboardFilters": false,
+        "drillToDashboardByName": false
+      },
+      "realTimeRefreshing": false,
+      "viewState": {
+        "activeTab": "filters"
+      },
+      "script": "",
+      "script_old": "",
+      "options": {
+        "dashboardFiltersMode": "filter",
+        "selector": false,
+        "triggersDomready": true,
+        "drillToAnywhere": true,
+        "autoUpdateOnEveryChange": true,
+        "imageColumns": [],
+        "selectorLocked": false,
+        "availableExcludeDims": [
+          "[Claim Status History.FPL Status]",
+          "[Claim.Claim Number]",
+          "[Region.Region Last Name]",
+          "[Claim Status History.CSH O/C Status Code]",
+          "[Claim Status History.CL_STATUS_ROW_ID]",
+          "[Claim.Claim Status Desc]",
+          "[Reserve Current.Reserve Type Code]",
+          "[Event.Event Category Desc]",
+          "[Event.Event Type Code]",
+          "[Claim.Claim Type Code]",
+          "[Claim Status History.Date Status Changed]",
+          "[Financial History.Eval Date]"
+        ],
+        "designPanelConfig": {
+          "shouldRender": false,
+          "selectedItem": -1
+        },
+        "interactivePivot": {
+          "enable": false
+        }
+      },
+      "dashboardid": "69bdb5c546a4e4003364528a",
+      "headerHidden": false,
+      "psData": {},
+      "query": {
+        "datasource": {
+          "address": "LocalHost",
+          "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+          "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+          "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+          "live": false
+        },
+        "format": "pivot",
+        "grandTotals": {
+          "title": "Grand Total",
+          "rows": true
+        },
+        "metadata": [
+          {
+            "jaql": {
+              "table": "Claim Status History",
+              "column": "FPL Status",
+              "dim": "[Claim Status History.FPL Status]",
+              "datatype": "text",
+              "merged": true,
+              "title": "FPL Status"
+            },
+            "instanceid": "FFEEB-BF06-B4",
+            "panel": "rows",
+            "field": {
+              "id": "[Claim Status History.FPL Status]",
+              "index": 0
+            },
+            "format": {
+              "subtotal": true
+            },
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Claim",
+              "column": "Claim Number",
+              "dim": "[Claim.Claim Number]",
+              "datatype": "text",
+              "merged": true,
+              "title": "Claim Number"
+            },
+            "instanceid": "14E46-9756-9B",
+            "panel": "rows",
+            "field": {
+              "id": "[Claim.Claim Number]",
+              "index": 1
+            },
+            "disabled": false,
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Region",
+              "column": "Region Last Name",
+              "dim": "[Region.Region Last Name]",
+              "datatype": "text",
+              "merged": true,
+              "title": "Region Last Name"
+            },
+            "instanceid": "33A23-B032-E3",
+            "panel": "rows",
+            "field": {
+              "id": "[Region.Region Last Name]",
+              "index": 2
+            },
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Claim Status History",
+              "column": "CSH O/C Status Code",
+              "dim": "[Claim Status History.CSH O/C Status Code]",
+              "datatype": "text",
+              "merged": true,
+              "title": "CSH O/C Status Code"
+            },
+            "instanceid": "710EF-20A4-30",
+            "panel": "rows",
+            "field": {
+              "id": "[Claim Status History.CSH O/C Status Code]",
+              "index": 3
+            },
+            "disabled": false,
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Claim Status History",
+              "column": "CL_STATUS_ROW_ID",
+              "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
+              "datatype": "numeric",
+              "title": "CL_STATUS_ROW_ID"
+            },
+            "instanceid": "02F1E-7583-F0",
+            "panel": "rows",
+            "field": {
+              "id": "[Claim Status History.CL_STATUS_ROW_ID]",
+              "index": 4
+            },
+            "disabled": false,
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Claim",
+              "column": "Claim Status Desc",
+              "dim": "[Claim.Claim Status Desc]",
+              "datatype": "text",
+              "merged": true,
+              "title": "Claim Status Desc"
+            },
+            "instanceid": "95EF5-5614-F5",
+            "panel": "rows",
+            "field": {
+              "id": "[Claim.Claim Status Desc]",
+              "index": 5
+            },
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "count([52C97-E3E])",
+              "context": {
+                "[52C97-E3E]": {
+                  "table": "Claim",
+                  "column": "Claim Number",
+                  "dim": "[Claim.Claim Number]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Claim Number"
+                }
+              },
+              "title": "Claim count",
+              "datatype": "numeric",
+              "subtotalAgg": "sum"
+            },
+            "instanceid": "B3907-D8DF-8A",
+            "panel": "measures",
+            "field": {
+              "id": "count([52C97-E3E])",
+              "index": 8
+            },
+            "format": {
+              "mask": {
+                "type": "number",
+                "t": true,
+                "b": true,
+                "separated": true,
+                "decimals": "auto",
+                "isdefault": true
+              },
+              "color": {
+                "type": "color",
+                "color": "transparent"
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {},
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "case when ([0ABFF-9B9],[4003B-611])>0 then ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[4003B-611])=0then  ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[87ED3-628])=0then  ([0ABFF-9B9],[87ED3-628])\n\nelse [0ABFF-9B9]\nend\nend \nend\n\n\n\n",
+              "context": {
+                "[0ABFF-9B9]": {
+                  "table": "Financial History",
+                  "column": "Incurred Amount",
+                  "dim": "[Financial History.Incurred Amount]",
+                  "datatype": "numeric",
+                  "agg": "sum",
+                  "title": "Total Incurred Amount"
+                },
+                "[87ED3-628]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": false,
+                    "multiSelection": true,
+                    "all": true
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "[4003B-611]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "BI"
+                    ]
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                }
+              },
+              "datatype": "numeric",
+              "subtotalAgg": "sum",
+              "title": "Incurred Total"
+            },
+            "instanceid": "C2E4B-B6B8-BD",
+            "panel": "measures",
+            "field": {
+              "id": "[Financial History.Incurred Amount]_sum",
+              "index": 9
+            },
+            "format": {
+              "mask": {
+                "abbreviations": {
+                  "t": false,
+                  "b": false,
+                  "m": false,
+                  "k": false
+                },
+                "decimals": 2,
+                "number": {
+                  "separated": true
+                },
+                "abbreviateAll": false
+              },
+              "color": {
+                "type": "color",
+                "color": "transparent"
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {},
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "case when ([7B487-F2F],[BAA81-5C2])>0 then ([7B487-F2F],[BAA81-5C2])\nelse case when ([7B487-F2F],[BAA81-5C2])=0then  ([7B487-F2F],[BAA81-5C2])\nelse case when ([7B487-F2F],[02E64-7D0])=0then  ([7B487-F2F],[02E64-7D0])\n\nelse [7B487-F2F]\nend\nend \nend\n\n\n          \n           \n  \n\n\n\n",
+              "context": {
+                "[02E64-7D0]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": false,
+                    "multiSelection": true,
+                    "all": true
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "[BAA81-5C2]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "BI"
+                    ]
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "[7B487-F2F]": {
+                  "table": "Financial History",
+                  "column": "Paid Amount",
+                  "dim": "[Financial History.Paid Amount]",
+                  "datatype": "numeric",
+                  "agg": "sum",
+                  "title": "Total Paid Amount"
+                }
+              },
+              "datatype": "numeric",
+              "subtotalAgg": "sum",
+              "title": "Paid Total"
+            },
+            "instanceid": "0CED1-CFFD-BA",
+            "panel": "measures",
+            "field": {
+              "id": "case when(( [7EEB5-391],[29254-127])>0)then ([7EEB5-391],[29254-127])/count([536CD-CB7])\n\nelse  ([7EEB5-391],[902FC-A44])/count([536CD-CB7]) end\n",
+              "index": 10
+            },
+            "format": {
+              "mask": {
+                "abbreviations": {
+                  "t": false,
+                  "b": false,
+                  "m": false,
+                  "k": false
+                },
+                "decimals": 2,
+                "number": {
+                  "separated": true
+                },
+                "abbreviateAll": false
+              },
+              "color": {
+                "type": "color",
+                "color": "transparent"
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {},
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "\n \n case when ([94E91-A83] = 0) then [94E91-A83] else case when\n( ([94E91-A83] , [47BF5-911]) <25000)   then ([94E91-A83] , [47BF5-911]) end end\n \n \n",
+              "context": {
+                "[94E91-A83]": {
+                  "table": "Financial History",
+                  "column": "Balance Amount",
+                  "dim": "[Financial History.Balance Amount]",
+                  "datatype": "numeric",
+                  "agg": "sum",
+                  "title": "Total Balance Amount"
+                },
+                "[47BF5-911]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "BI"
+                    ]
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                }
+              },
+              "datatype": "numeric",
+              "subtotalAgg": "sum",
+              "title": "Outstanding Total"
+            },
+            "instanceid": "01F90-85A1-4F",
+            "panel": "measures",
+            "field": {
+              "id": "[Financial History.Balance Amount]_sum",
+              "index": 11
+            },
+            "format": {
+              "mask": {
+                "abbreviations": {
+                  "t": false,
+                  "b": false,
+                  "m": false,
+                  "k": false
+                },
+                "decimals": 2,
+                "number": {
+                  "separated": true
+                },
+                "abbreviateAll": false
+              },
+              "color": {
+                "type": "color",
+                "color": "transparent"
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {},
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "case when ([0ABFF-9B9],[4003B-611])>0 then ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[4003B-611])=0then  ([0ABFF-9B9],[4003B-611])\nelse case when ([0ABFF-9B9],[87ED3-628])=0then  ([0ABFF-9B9],[87ED3-628])\n\nelse [0ABFF-9B9]\nend\nend \nend\n\n\n\n",
+              "context": {
+                "[0ABFF-9B9]": {
+                  "table": "Financial History",
+                  "column": "Incurred Amount",
+                  "dim": "[Financial History.Incurred Amount]",
+                  "datatype": "numeric",
+                  "agg": "sum",
+                  "title": "Total Incurred Amount"
+                },
+                "[87ED3-628]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": false,
+                    "multiSelection": true,
+                    "all": true
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                },
+                "[4003B-611]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "BI"
+                    ]
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                }
+              },
+              "datatype": "numeric",
+              "subtotalAgg": "avg",
+              "title": "Average Incurred Loss"
+            },
+            "instanceid": "C2E4B-B6B8-BD",
+            "panel": "measures",
+            "field": {
+              "id": "[Financial History.Incurred Amount]_sum",
+              "index": 12
+            },
+            "format": {
+              "mask": {
+                "abbreviations": {
+                  "t": false,
+                  "b": false,
+                  "m": false,
+                  "k": false
+                },
+                "decimals": 2,
+                "number": {
+                  "separated": true
+                },
+                "abbreviateAll": false
+              },
+              "color": {
+                "type": "color",
+                "color": "transparent"
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {},
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "case when ([B7178-539] = 0) then 1 else case when\n( ([B7178-539] , [F8B2C-86C]) <25000)   then 1  else 0 end end",
+              "context": {
+                "[B7178-539]": {
+                  "table": "Financial History",
+                  "column": "Balance Amount",
+                  "dim": "[Financial History.Balance Amount]",
+                  "datatype": "numeric",
+                  "agg": "sum",
+                  "title": "Total Balance Amount"
+                },
+                "[F8B2C-86C]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "BI"
+                    ]
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                }
+              },
+              "title": "Formula",
+              "datatype": "numeric",
+              "filter": {
+                "equals": "1"
+              },
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              },
+              "collapsed": false
+            },
+            "instanceid": "A8E59-7E20-84",
+            "panel": "scope",
+            "format": {
+              "mask": {
+                "type": "number",
+                "t": true,
+                "b": true,
+                "separated": true,
+                "decimals": "auto",
+                "isdefault": true
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "table": "Event",
+              "column": "Event Category Desc",
+              "dim": "[Event.Event Category Desc]",
+              "datatype": "text",
+              "merged": true,
+              "isDashboardFilter": false,
+              "filter": {
+                "explicit": true,
+                "multiSelection": true,
+                "members": [
+                  "Fleet Accident",
+                  "Non-Fleet Accident"
+                ]
+              },
+              "collapsed": true,
+              "title": "Event Category Desc",
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              }
+            },
+            "instanceid": "D9CE0-2E41-41",
+            "panel": "scope",
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Claim Status History",
+              "column": "CSH O/C Status Code",
+              "dim": "[Claim Status History.CSH O/C Status Code]",
+              "datatype": "text",
+              "merged": true,
+              "isDashboardFilter": false,
+              "filter": {
+                "explicit": true,
+                "multiSelection": true,
+                "members": [
+                  "O"
+                ]
+              },
+              "collapsed": true,
+              "title": "CSH O/C Status Code",
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              }
+            },
+            "instanceid": "12D04-5B2A-31",
+            "panel": "scope",
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Event",
+              "column": "Event Type Code",
+              "dim": "[Event.Event Type Code]",
+              "datatype": "text",
+              "merged": true,
+              "isDashboardFilter": false,
+              "filter": {
+                "explicit": true,
+                "multiSelection": true,
+                "members": [
+                  "VE"
+                ]
+              },
+              "collapsed": true,
+              "title": "Event Type Code",
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              }
+            },
+            "instanceid": "A770C-BEFF-37",
+            "panel": "scope",
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "table": "Claim",
+              "column": "Claim Type Code",
+              "dim": "[Claim.Claim Type Code]",
+              "datatype": "text",
+              "merged": true,
+              "isDashboardFilter": false,
+              "filter": {
+                "explicit": true,
+                "multiSelection": true,
+                "members": [
+                  "BODI"
+                ]
+              },
+              "collapsed": true,
+              "title": "Claim Type Code",
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              }
+            },
+            "instanceid": "8E15E-EFCB-7C",
+            "panel": "scope",
+            "handlers": []
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
+              "context": {
+                "[40C79-13D]": {
+                  "table": "Claim Status History",
+                  "column": "CL_STATUS_ROW_ID",
+                  "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
+                  "datatype": "numeric",
+                  "title": "CL_STATUS_ROW_ID"
+                },
+                "[991E4-56E]": {
+                  "table": "Claim Status History",
+                  "column": "CLAIM_ID",
+                  "dim": "[Claim Status History.CLAIM_ID]",
+                  "datatype": "numeric",
+                  "title": "CLAIM_ID"
+                }
+              },
+              "datatype": "numeric",
+              "title": "Formula1",
+              "filter": {
+                "equals": "1"
+              },
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              },
+              "collapsed": false
+            },
+            "instanceid": "DBC20-B5AC-D8",
+            "panel": "scope",
+            "format": {
+              "mask": {
+                "type": "number",
+                "t": true,
+                "b": true,
+                "separated": true,
+                "decimals": "auto",
+                "isdefault": true
+              }
+            },
+            "handlers": [
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "table": "Claim Status History",
+              "column": "Date Status Changed",
+              "dim": "[Claim Status History.Date Status Changed (Calendar)]",
+              "datatype": "datetime",
+              "merged": true,
+              "isDashboardFilter": true,
+              "level": "days",
+              "title": "Days in Date Status Changed",
+              "collapsed": true,
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              },
+              "filter": {
+                "to": "2026-03-20"
+              }
+            },
+            "disabled": false,
+            "isCascading": false,
+            "instanceid": "16E03-B1C9-38",
+            "panel": "scope"
+          },
+          {
+            "jaql": {
+              "table": "Financial History",
+              "column": "Eval Date",
+              "dim": "[Financial History.Eval Date (Calendar)]",
+              "datatype": "datetime",
+              "merged": true,
+              "isDashboardFilter": true,
+              "level": "days",
+              "title": "Days in Eval Date",
+              "collapsed": true,
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              },
+              "filter": {
+                "to": "2026-03-20"
+              }
+            },
+            "disabled": false,
+            "isCascading": false,
+            "instanceid": "1A91C-F385-04",
+            "panel": "scope"
+          },
+          {
+            "jaql": {
+              "table": "Region",
+              "column": "Region Last Name",
+              "dim": "[Region.Region Last Name]",
+              "datatype": "text",
+              "merged": true,
+              "isDashboardFilter": true,
+              "collapsed": true,
+              "title": "Region Last Name",
+              "datasource": {
+                "address": "LocalHost",
+                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                "live": false
+              },
+              "filter": {
+                "explicit": true,
+                "multiSelection": true,
+                "members": [
+                  "Florida Power & Light"
+                ]
+              }
+            },
+            "disabled": false,
+            "isCascading": false,
+            "instanceid": "FF1DD-4977-85",
+            "panel": "scope"
+          }
+        ],
+        "m2mThresholdFlag": 0,
+        "isMaskedResult": true,
+        "widgetType": "pivot2",
+        "by": "widget",
+        "dashboard": "69bdb5c546a4e4003364528a;CBU-1803-Claimant_VEH_BI_Case_Eval_LT_25k_03182019_DXC"
+      },
+      "waitingForUserTimezone": false,
+      "wasRendered": false
+    }
+  ],
+  "hierarchies": [],
+  "defaultFilters": []
+}

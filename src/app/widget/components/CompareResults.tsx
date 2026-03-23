@@ -257,6 +257,19 @@ function rowKey(row: string[]): string {
   return JSON.stringify(row.map((cell) => cell ?? ''));
 }
 
+function maxColumnCount(rows: string[][]): number {
+  return rows.reduce((max, row) => Math.max(max, row.length), 0);
+}
+
+function buildDynamicHeaders(
+  payloadHeaders: string[],
+  rows: string[][],
+  fallbackPrefix: string
+): string[] {
+  const count = Math.max(payloadHeaders.length, maxColumnCount(rows), 1);
+  return Array.from({ length: count }, (_, i) => payloadHeaders[i] ?? `${fallbackPrefix} ${i + 1}`);
+}
+
 function buildRowCountMap(rows: string[][]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -313,6 +326,19 @@ function WidgetNaturalPreview({
     );
   }
 
+  if (widgetType.includes('tablewidget')) {
+    return (
+      <TableWidgetPreview
+        widgetType={widgetType}
+        widgetSubType={widgetSubType}
+        panels={panels}
+        queryRows={queryRows}
+        queryLoading={queryLoading}
+        peerRows={peerRows}
+      />
+    );
+  }
+
   return (
     <div className="p-4 bg-white">
       <div className="text-xs text-slate-500 mb-3">
@@ -320,6 +346,88 @@ function WidgetNaturalPreview({
       </div>
       <div className="text-[11px] text-slate-600">
         Using metadata summary for now. You can still compare payload values and audit output data below.
+      </div>
+    </div>
+  );
+}
+
+function TableWidgetPreview({
+  widgetType,
+  widgetSubType,
+  panels,
+  queryRows,
+  queryLoading,
+  peerRows,
+}: {
+  widgetType: string;
+  widgetSubType: string;
+  panels: WidgetPanel[];
+  queryRows: string[][];
+  queryLoading: boolean;
+  peerRows: string[][];
+}) {
+  const orderedPanelNames = ['rows', 'columns', 'values', 'breakBy', 'series', 'categories'];
+  const payloadHeaders = orderedPanelNames.flatMap((panelName) =>
+    getPanelItems(panels, panelName)
+      .filter((item) => !item.disabled)
+      .map(jaqlLabel)
+      .filter(Boolean)
+  );
+  const headers = buildDynamicHeaders(payloadHeaders, queryRows, 'Column');
+  const rowMismatchFlags = getRowMismatchFlags(queryRows, peerRows);
+
+  return (
+    <div className="p-1 bg-white">
+      <div className="rounded-md border border-slate-300 overflow-auto max-h-[420px]">
+        <table className="w-full text-[13px]">
+          <thead className="bg-slate-100 border-b border-slate-300 sticky top-0 z-10">
+            <tr>
+              {headers.map((head) => (
+                <th
+                  key={head}
+                  className="text-left p-2 font-semibold text-slate-600 whitespace-nowrap border-r border-slate-300 last:border-r-0"
+                >
+                  {head}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {queryLoading && (
+              <tr>
+                <td colSpan={headers.length} className="p-3 text-slate-400 text-[12px] italic">
+                  Loading live query rows...
+                </td>
+              </tr>
+            )}
+            {!queryLoading && queryRows.length > 0 && queryRows.map((cells, rowIdx) => (
+              <tr key={rowIdx} className="border-b border-slate-300 last:border-b-0">
+                {headers.map((_, colIdx) => (
+                  <td
+                    key={`${rowIdx}-${colIdx}`}
+                    className={`p-2 border-r border-slate-300 last:border-r-0 align-top ${
+                      rowMismatchFlags[rowIdx]
+                        ? 'text-rose-700 bg-rose-50/60 font-semibold'
+                        : 'text-slate-700'
+                    }`}
+                  >
+                    {cells[colIdx] || ''}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {!queryLoading && queryRows.length === 0 && (
+              <tr>
+                <td colSpan={headers.length} className="p-3 text-slate-400 text-[12px] italic">
+                  No rows returned from preview query for this widget.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
+        {widgetType} / {widgetSubType}
       </div>
     </div>
   );

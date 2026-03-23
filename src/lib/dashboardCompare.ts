@@ -114,7 +114,23 @@ interface WidgetCompareResultItem {
   reason?: string;
 }
 
-const IGNORED_COMPARE_PATHS = new Set(['widget.style.content.html']);
+const DEFAULT_PREVIEW_ROW_LIMIT = 10000;
+
+const IGNORED_COMPARE_PATHS = new Set([
+  'widget.style.content.html',
+  'widget.datasource.fullname',
+  'widget.query.datasource.fullname',
+]);
+const IGNORED_COMPARE_PATH_PATTERNS = [
+  /^widget\.query\.metadata\.\d+\.jaql\.datasource\.(database|title|fullname|id)$/,
+  /^widget\.query\.metadata\.\d+\.jaql\.context\.\[[^\]]+\]\.datasource\.(database|title|fullname|id)$/,
+  /^widget\.panels\.\d+\.items\.\d+\.jaql\.datasource\.(database|title|fullname|id)$/,
+  /^widget\.panels\.\d+\.items\.\d+\.jaql\.context\.\[[^\]]+\]\.datasource\.(database|title|fullname|id)$/,
+];
+
+const shouldIgnoreComparePath = (path: string): boolean =>
+  IGNORED_COMPARE_PATHS.has(path) ||
+  IGNORED_COMPARE_PATH_PATTERNS.some((pattern) => pattern.test(path));
 
 const stableStringify = (value: unknown): string => {
   if (Array.isArray(value)) {
@@ -145,7 +161,7 @@ const collectFieldComparisons = (
   right: unknown,
   path: string
 ): WidgetFieldComparisonRow[] => {
-  if (path && IGNORED_COMPARE_PATHS.has(path)) {
+  if (path && shouldIgnoreComparePath(path)) {
     return [];
   }
 
@@ -335,7 +351,7 @@ const buildPreviewJaqlBody = (widget: SisenseWidget): PreviewJaqlBody | null => 
   const datasource = normalizeDatasourceForBody(datasourceFullname);
   return {
     datasource,
-    count: 1000,
+    count: DEFAULT_PREVIEW_ROW_LIMIT,
     metadata: filtered.map((item) => {
       if (item.panel === 'scope' && item.jaql && !item.jaql.datasource) {
         return {
@@ -402,7 +418,7 @@ const fetchPreviewRows = async (
     const fullQueryBody: PreviewJaqlBody = {
       datasource: normalizeDatasourceForBody(queryDatasource),
       metadata: queryMetadata as PreviewJaqlMetadataItem[],
-      count: widget.query?.count ?? 1000,
+      count: widget.query?.count ?? DEFAULT_PREVIEW_ROW_LIMIT,
     };
     return postJaqlAndReadRows(fullQueryBody);
   }

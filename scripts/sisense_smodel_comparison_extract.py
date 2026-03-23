@@ -41,6 +41,21 @@ DATA_TYPE_GROUPS: Dict[str, str] = {
     "40": "number",
 }
 
+DATA_TYPE_LABELS: Dict[str, str] = {
+    "4": "Date-Time",
+    "6": "Number",
+    "8": "Integer",
+    "16": "Integer",
+    "18": "Text",
+    "19": "Date-Time",
+    "31": "Date-Time",
+    "40": "Number",
+    "date_time": "Date-Time",
+    "integer": "Integer",
+    "number": "Number",
+    "text": "Text",
+}
+
 
 def df_records(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """Convert dataframe rows to JSON-safe records (NaN/NA -> None)."""
@@ -152,6 +167,14 @@ def normalize_data_type_group(value: Any) -> str:
         return ""
     lowered = raw.lower()
     return DATA_TYPE_GROUPS.get(lowered, lowered)
+
+
+def format_data_type_label(value: Any) -> str:
+    raw = str(value or "").strip()
+    if raw == "":
+        return ""
+    lowered = raw.lower()
+    return DATA_TYPE_LABELS.get(lowered, f"Code {raw}")
 
 
 def build_effective_columns(table_obj: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -328,8 +351,10 @@ def extract_metadata(model: Dict[str, Any], source_file: str, model_name: str) -
                         "description": c.get("description"),
                         "dataType": c.get("dataType"),
                         "dataTypeGroup": normalize_data_type_group(c.get("dataType")),
+                        "dataTypeLabel": format_data_type_label(c.get("dataType")),
                         "originalDataType": c.get("originalDataType"),
                         "originalDataTypeGroup": normalize_data_type_group(c.get("originalDataType")),
+                        "originalDataTypeLabel": format_data_type_label(c.get("originalDataType")),
                         "expression": c.get("expression"),
                         "column_origin": c.get("columnOrigin"),
                         "is_custom_field": c.get("columnOrigin") == "add-column",
@@ -833,6 +858,8 @@ def build_column_attr_diff_tab(
         "column_id",
         "column_name",
         "column_origin",
+        "dataTypeLabel",
+        "originalDataTypeLabel",
         "originalDataTypeGroup",
         attr,
     ]:
@@ -883,14 +910,7 @@ def build_column_attr_diff_tab(
         merged["val_a_norm"] = merged["val_a"].apply(_norm_hidden)
         merged["val_b_norm"] = merged["val_b"].apply(_norm_hidden)
     elif attr == "dataTypeGroup":
-        def _normalized_datatype_for_compare(row: pd.Series) -> str:
-            # Ignore physical-column datatype casts when the underlying source type is unchanged.
-            original_group = str(row.get("originalDataTypeGroup") or "").strip().lower()
-            effective_group = str(row.get(attr) or "").strip().lower()
-            column_origin = str(row.get("column_origin") or "").strip().lower()
-            return original_group if column_origin == "physical" and original_group else effective_group
-
-        df["_attr_norm"] = df.apply(_normalized_datatype_for_compare, axis=1)
+        df["_attr_norm"] = df[attr].astype(str).str.strip().str.lower()
         attr_sets_a = (
             df[df["model"] == model_a]
             .groupby(key, dropna=False)["_attr_norm"]
@@ -908,6 +928,36 @@ def build_column_attr_diff_tab(
         merged["val_b_set"] = merged["val_b_set"].apply(lambda value: value if isinstance(value, list) else [])
         merged["val_a_norm"] = merged["val_a_set"].apply(lambda value: "|".join(value))
         merged["val_b_norm"] = merged["val_b_set"].apply(lambda value: "|".join(value))
+        final_labels_a = (
+            df[df["model"] == model_a]
+            .groupby(key, dropna=False)["dataTypeLabel"]
+            .agg(lambda s: " | ".join(sorted({value for value in s if value != ""})))
+            .reset_index(name="final_type_in_model_a")
+        )
+        final_labels_b = (
+            df[df["model"] == model_b]
+            .groupby(key, dropna=False)["dataTypeLabel"]
+            .agg(lambda s: " | ".join(sorted({value for value in s if value != ""})))
+            .reset_index(name="final_type_in_model_b")
+        )
+        original_labels_a = (
+            df[df["model"] == model_a]
+            .groupby(key, dropna=False)["originalDataTypeLabel"]
+            .agg(lambda s: " | ".join(sorted({value for value in s if value != ""})))
+            .reset_index(name="original_type_in_model_a")
+        )
+        original_labels_b = (
+            df[df["model"] == model_b]
+            .groupby(key, dropna=False)["originalDataTypeLabel"]
+            .agg(lambda s: " | ".join(sorted({value for value in s if value != ""})))
+            .reset_index(name="original_type_in_model_b")
+        )
+        merged = (
+            merged.merge(final_labels_a, on=key, how="left")
+            .merge(final_labels_b, on=key, how="left")
+            .merge(original_labels_a, on=key, how="left")
+            .merge(original_labels_b, on=key, how="left")
+        )
     else:
         merged["val_a_norm"] = merged["val_a"].astype(str).str.strip().str.lower()
         merged["val_b_norm"] = merged["val_b"].astype(str).str.strip().str.lower()
@@ -932,6 +982,14 @@ def build_column_attr_diff_tab(
         column_names_in_model_a=("col_name_a", list),
         column_names_in_model_b=("col_name_b", list),
     ).reset_index()
+    if attr == "dataTypeGroup":
+        datatype_details = diff.groupby(["_table_name_key"], dropna=False).agg(
+            final_types_in_model_a=("final_type_in_model_a", list),
+            final_types_in_model_b=("final_type_in_model_b", list),
+            original_types_in_model_a=("original_type_in_model_a", list),
+            original_types_in_model_b=("original_type_in_model_b", list),
+        ).reset_index()
+        per_table = per_table.merge(datatype_details, on=["_table_name_key"], how="left")
 
     if attr == "hidden":
         hidden_totals_a = (
@@ -1127,6 +1185,15 @@ def build_column_attr_diff_tab(
         "column_names_in_model_a",
         "column_names_in_model_b",
     ]
+    if attr == "dataTypeGroup":
+        out_cols.extend(
+            [
+                "final_types_in_model_a",
+                "final_types_in_model_b",
+                "original_types_in_model_a",
+                "original_types_in_model_b",
+            ]
+        )
     if attr == "hidden":
         out_cols.extend([
             "hidden_total_in_model_a",

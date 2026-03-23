@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { normalizeBaseUrl } from '@/lib/network';
 import { hasSisenseAuth, resolveSisenseBearer } from '@/lib/sisenseAuth';
 
+const DEFAULT_PREVIEW_ROW_LIMIT = 10000;
+
 interface WidgetPanelItem {
   jaql?: unknown;
   disabled?: boolean;
@@ -68,7 +70,7 @@ function extractComparableWidget(widget: SisenseWidget) {
         fullname: query.datasource?.fullname ?? widget.datasource?.fullname ?? null,
       },
       metadata: query.metadata ?? [],
-      count: query.count ?? 1000,
+      count: query.count ?? DEFAULT_PREVIEW_ROW_LIMIT,
     },
     panels: panels.map((p) => ({
       name: p.name,
