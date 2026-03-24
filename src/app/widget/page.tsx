@@ -75,6 +75,7 @@ const shouldIgnoreComparePath = (path: string): boolean =>
   IGNORED_COMPARE_PATH_PATTERNS.some((pattern) => pattern.test(path));
 
 const DEFAULT_PREVIEW_ROW_LIMIT = 10000;
+const PREVIEW_DISPLAY_PANELS = ['rows', 'columns', 'values', 'breakBy', 'series', 'categories'];
 
 const isValidHttpUrl = (value: string) => {
   try {
@@ -156,13 +157,15 @@ const resolveDatasourceFullname = (
 
 const getExpectedPreviewColumns = (payload: WidgetPayloadTyped): number => {
   const panels = asPanels(payload.panels);
-  const fromPanels =
-    getPanelItems(panels, 'rows').length + getPanelItems(panels, 'values').length;
+  const fromPanels = PREVIEW_DISPLAY_PANELS.reduce(
+    (total, panelName) => total + getPanelItems(panels, panelName).length,
+    0
+  );
   if (fromPanels > 0) return fromPanels;
 
   if (!Array.isArray(payload.metadata)) return 0;
   return payload.metadata.filter(
-    (item) => !item.disabled && (item.panel === 'rows' || item.panel === 'values')
+    (item) => !item.disabled && PREVIEW_DISPLAY_PANELS.includes(item.panel ?? '')
   ).length;
 };
 
@@ -182,20 +185,34 @@ const getEnvConfig = (inputs: QaInputs, env: Environment) =>
 const hasQueryMetadata = (payload: WidgetPayloadTyped): boolean =>
   Array.isArray(payload.query?.metadata) && payload.query.metadata.length > 0;
 
+const normalizePreviewCell = (cell: unknown): string => {
+  if (cell && typeof cell === 'object') {
+    const obj = cell as {
+      text?: unknown;
+      data?: unknown;
+      value?: unknown;
+      formatted?: unknown;
+    };
+
+    if (typeof obj.text === 'string') return obj.text;
+    if (typeof obj.formatted === 'string') return obj.formatted;
+    if (obj.data !== undefined && obj.data !== null) return String(obj.data);
+    if (obj.value !== undefined && obj.value !== null) return String(obj.value);
+  }
+  if (cell === null || cell === undefined) return '';
+  return String(cell);
+};
+
 const normalizePreviewRows = (values: unknown, expectedColumns: number): string[][] => {
   if (!Array.isArray(values)) return [];
 
   return values.map((row) => {
-    const arr = Array.isArray(row) ? row : [row];
-    const normalized = arr.slice(0, expectedColumns).map((cell) => {
-      if (cell && typeof cell === 'object') {
-        const obj = cell as { text?: unknown; data?: unknown };
-        if (typeof obj.text === 'string') return obj.text;
-        if (obj.data !== undefined && obj.data !== null) return String(obj.data);
-      }
-      if (cell === null || cell === undefined) return '';
-      return String(cell);
-    });
+    const arr = Array.isArray(row)
+      ? row
+      : row && typeof row === 'object'
+        ? Object.values(row as Record<string, unknown>)
+        : [row];
+    const normalized = arr.slice(0, expectedColumns).map(normalizePreviewCell);
 
     while (normalized.length < expectedColumns) normalized.push('');
     return normalized;
@@ -206,7 +223,6 @@ const getPreviewHeadersFromPayload = (payload: WidgetPayloadTyped | null): strin
   if (!payload) return [];
 
   const panels = asPanels(payload.panels);
-  const orderedPanelNames = ['rows', 'columns', 'values', 'breakBy', 'series', 'categories'];
   const labelByPanel = new Map<string, string[]>();
 
   for (const panel of panels) {
@@ -218,9 +234,11 @@ const getPreviewHeadersFromPayload = (payload: WidgetPayloadTyped | null): strin
     labelByPanel.set(name, labels);
   }
 
-  const orderedLabels = orderedPanelNames.flatMap((name) => labelByPanel.get(name) ?? []);
+  const orderedLabels = PREVIEW_DISPLAY_PANELS.flatMap((name) => labelByPanel.get(name) ?? []);
   const remainingLabels = Array.from(labelByPanel.entries())
-    .filter(([name]) => !orderedPanelNames.includes(name) && name !== 'filters' && name !== 'scope')
+    .filter(
+      ([name]) => !PREVIEW_DISPLAY_PANELS.includes(name) && name !== 'filters' && name !== 'scope'
+    )
     .flatMap(([, labels]) => labels);
 
   return [...orderedLabels, ...remainingLabels];
