@@ -1,5 +1,5 @@
 {
-  "title": "CBU-1803-Claimant_VEH_BI_Case_Eval_LT_25k_03182019_DXC",
+  "title": "CBU-1803-Claimant_VEH_BI_Case_Eval_LT_25k_03182019_DXC (1)",
   "desc": "",
   "source": null,
   "type": "dashboard",
@@ -33,28 +33,28 @@
                     "minWidth": 128,
                     "maxWidth": 2048,
                     "defaultWidth": 512,
-                    "widgetid": "69bdb5c546a4e4003364528c",
+                    "widgetid": "69c309e63c49da0033703a60",
                     "height": "792px",
                     "autoHeight": "792px"
                   }
                 ],
                 "width": 100,
                 "stretchable": false,
-                "pxlWidth": 1583,
+                "pxlWidth": 1449,
                 "index": 0
               }
             ]
           }
         ],
-        "pxlWidth": 1583,
+        "pxlWidth": 1449,
         "index": 0
       }
     ],
     "container": {
-      "sizzle1774047734332": {
+      "sizzle1774374377057": {
         "undefined": {
           "parentNode": [
-            118.30511378320605,
+            168.59019469091072,
             27,
             true
           ]
@@ -66,7 +66,7 @@
   "dataExploration": false,
   "lastOpened": null,
   "previewLayout": [],
-  "oid": "69bdb5c546a4e4003364528a",
+  "oid": "69c309e63c49da0033703a5f",
   "datasource": {
     "address": "LocalHost",
     "title": "Florida P&L - Production - Financial - Jan 2025 0001",
@@ -173,7 +173,7 @@
       "title": "CBU-1803-Claimant_VEH_BI_Case_Eval_LT_25k_03182019_DXC_Report1",
       "type": "pivot2",
       "subtype": "pivot2",
-      "oid": "69bdb5c546a4e4003364528c",
+      "oid": "69c309e63c49da0033703a60",
       "desc": null,
       "source": null,
       "datasource": {
@@ -304,6 +304,51 @@
               {
                 "jaql": {
                   "type": "measure",
+                  "formula": "SUM( RANK([7A315-264], \"DESC\", \"1224\", [5A1F5-B3D]))",
+                  "context": {
+                    "[7A315-264]": {
+                      "table": "Claim Status History",
+                      "column": "CL_STATUS_ROW_ID",
+                      "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total CL_STATUS_ROW_ID"
+                    },
+                    "[5A1F5-B3D]": {
+                      "table": "Claim Status History",
+                      "column": "CLAIM_ID",
+                      "dim": "[Claim Status History.CLAIM_ID]",
+                      "datatype": "numeric",
+                      "title": "CLAIM_ID"
+                    }
+                  },
+                  "title": "RankAsOf",
+                  "datatype": "numeric"
+                },
+                "instanceid": "F8839-ED1C-62",
+                "panel": "measures",
+                "field": {
+                  "id": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
+                  "index": 6
+                },
+                "format": {
+                  "mask": {
+                    "type": "number",
+                    "t": true,
+                    "b": true,
+                    "separated": true,
+                    "decimals": "auto",
+                    "isdefault": true
+                  },
+                  "color": {
+                    "type": "color"
+                  }
+                },
+                "disabled": false
+              },
+              {
+                "jaql": {
+                  "type": "measure",
                   "formula": "case when ([B7178-539] = 0) then 1 else case when\n( ([B7178-539] , [F8B2C-86C]) <25000)   then 1  else 0 end end",
                   "context": {
                     "[B7178-539]": {
@@ -346,50 +391,6 @@
                 "panel": "measures",
                 "field": {
                   "id": "case when [F7C6F-2A3]>10 then 1 else 0 end",
-                  "index": 6
-                },
-                "format": {
-                  "mask": {
-                    "type": "number",
-                    "t": true,
-                    "b": true,
-                    "separated": true,
-                    "decimals": "auto",
-                    "isdefault": true
-                  },
-                  "color": {
-                    "type": "color"
-                  }
-                },
-                "disabled": true
-              },
-              {
-                "jaql": {
-                  "type": "measure",
-                  "formula": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
-                  "context": {
-                    "[40C79-13D]": {
-                      "table": "Claim Status History",
-                      "column": "CL_STATUS_ROW_ID",
-                      "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
-                      "datatype": "numeric",
-                      "title": "CL_STATUS_ROW_ID"
-                    },
-                    "[991E4-56E]": {
-                      "table": "Claim Status History",
-                      "column": "CLAIM_ID",
-                      "dim": "[Claim Status History.CLAIM_ID]",
-                      "datatype": "numeric",
-                      "title": "CLAIM_ID"
-                    }
-                  },
-                  "datatype": "numeric",
-                  "title": "Formula1"
-                },
-                "instanceid": "F8839-ED1C-62",
-                "panel": "measures",
-                "field": {
-                  "id": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
                   "index": 7
                 },
                 "format": {
@@ -405,7 +406,7 @@
                     "type": "color"
                   }
                 },
-                "disabled": true
+                "disabled": false
               },
               {
                 "jaql": {
@@ -421,9 +422,9 @@
                       "title": "Claim Number"
                     }
                   },
-                  "title": "Claim count",
                   "datatype": "numeric",
-                  "subtotalAgg": "sum"
+                  "subtotalAgg": "sum",
+                  "title": "Claim count"
                 },
                 "instanceid": "B3907-D8DF-8A",
                 "panel": "measures",
@@ -831,11 +832,12 @@
                       }
                     }
                   },
-                  "title": "Formula",
                   "datatype": "numeric",
                   "filter": {
                     "equals": "1"
                   },
+                  "collapsed": false,
+                  "title": "Formula",
                   "datasource": {
                     "address": "LocalHost",
                     "title": "Florida P&L - Production - Financial - Jan 2025 0001",
@@ -843,8 +845,7 @@
                     "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
                     "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
                     "live": false
-                  },
-                  "collapsed": false
+                  }
                 },
                 "instanceid": "A8E59-7E20-84",
                 "panel": "scope",
@@ -857,8 +858,56 @@
                     "decimals": "auto",
                     "isdefault": true
                   }
+                }
+              },
+              {
+                "jaql": {
+                  "type": "measure",
+                  "formula": "SUM( RANK([DBAB7-BE8], \"DESC\", \"1234\", [183D2-7DF]))",
+                  "context": {
+                    "[DBAB7-BE8]": {
+                      "table": "Claim Status History",
+                      "column": "CL_STATUS_ROW_ID",
+                      "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
+                      "datatype": "numeric",
+                      "agg": "sum",
+                      "title": "Total CL_STATUS_ROW_ID"
+                    },
+                    "[183D2-7DF]": {
+                      "table": "Claim Status History",
+                      "column": "CLAIM_ID",
+                      "dim": "[Claim Status History.CLAIM_ID]",
+                      "datatype": "numeric",
+                      "title": "CLAIM_ID"
+                    }
+                  },
+                  "title": "RankAsOf",
+                  "datatype": "numeric",
+                  "filter": {
+                    "equals": "1"
+                  },
+                  "collapsed": false,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
                 },
-                "disabled": false
+                "instanceid": "087B6-88DA-4E",
+                "panel": "scope",
+                "format": {
+                  "mask": {
+                    "type": "number",
+                    "t": true,
+                    "b": true,
+                    "separated": true,
+                    "decimals": "auto",
+                    "isdefault": true
+                  }
+                }
               },
               {
                 "jaql": {
@@ -1157,7 +1206,7 @@
           "enable": false
         }
       },
-      "dashboardid": "69bdb5c546a4e4003364528a",
+      "dashboardid": "69c309e63c49da0033703a5f",
       "headerHidden": false,
       "psData": {},
       "query": {
@@ -1285,6 +1334,123 @@
           {
             "jaql": {
               "type": "measure",
+              "formula": "SUM( RANK([7A315-264], \"DESC\", \"1224\", [5A1F5-B3D]))",
+              "context": {
+                "[7A315-264]": {
+                  "table": "Claim Status History",
+                  "column": "CL_STATUS_ROW_ID",
+                  "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
+                  "datatype": "numeric",
+                  "agg": "sum",
+                  "title": "Total CL_STATUS_ROW_ID"
+                },
+                "[5A1F5-B3D]": {
+                  "table": "Claim Status History",
+                  "column": "CLAIM_ID",
+                  "dim": "[Claim Status History.CLAIM_ID]",
+                  "datatype": "numeric",
+                  "title": "CLAIM_ID"
+                }
+              },
+              "title": "RankAsOf",
+              "datatype": "numeric"
+            },
+            "instanceid": "F8839-ED1C-62",
+            "panel": "measures",
+            "field": {
+              "id": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
+              "index": 6
+            },
+            "format": {
+              "mask": {
+                "type": "number",
+                "t": true,
+                "b": true,
+                "separated": true,
+                "decimals": "auto",
+                "isdefault": true
+              },
+              "color": {
+                "type": "color",
+                "color": "transparent"
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {},
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "type": "measure",
+              "formula": "case when ([B7178-539] = 0) then 1 else case when\n( ([B7178-539] , [F8B2C-86C]) <25000)   then 1  else 0 end end",
+              "context": {
+                "[B7178-539]": {
+                  "table": "Financial History",
+                  "column": "Balance Amount",
+                  "dim": "[Financial History.Balance Amount]",
+                  "datatype": "numeric",
+                  "agg": "sum",
+                  "title": "Total Balance Amount"
+                },
+                "[F8B2C-86C]": {
+                  "table": "Reserve Current",
+                  "column": "Reserve Type Code",
+                  "dim": "[Reserve Current.Reserve Type Code]",
+                  "datatype": "text",
+                  "merged": true,
+                  "title": "Reserve Type Code",
+                  "filter": {
+                    "explicit": true,
+                    "multiSelection": true,
+                    "members": [
+                      "BI"
+                    ]
+                  },
+                  "collapsed": true,
+                  "datasource": {
+                    "address": "LocalHost",
+                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
+                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
+                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
+                    "live": false
+                  }
+                }
+              },
+              "datatype": "numeric",
+              "title": "Formula"
+            },
+            "instanceid": "ED1FC-B4F8-6F",
+            "panel": "measures",
+            "field": {
+              "id": "case when [F7C6F-2A3]>10 then 1 else 0 end",
+              "index": 7
+            },
+            "format": {
+              "mask": {
+                "type": "number",
+                "t": true,
+                "b": true,
+                "separated": true,
+                "decimals": "auto",
+                "isdefault": true
+              },
+              "color": {
+                "type": "color",
+                "color": "transparent"
+              }
+            },
+            "disabled": false,
+            "handlers": [
+              {},
+              {}
+            ]
+          },
+          {
+            "jaql": {
+              "type": "measure",
               "formula": "count([52C97-E3E])",
               "context": {
                 "[52C97-E3E]": {
@@ -1296,9 +1462,9 @@
                   "title": "Claim Number"
                 }
               },
-              "title": "Claim count",
               "datatype": "numeric",
-              "subtotalAgg": "sum"
+              "subtotalAgg": "sum",
+              "title": "Claim count"
             },
             "instanceid": "B3907-D8DF-8A",
             "panel": "measures",
@@ -1687,46 +1853,30 @@
           {
             "jaql": {
               "type": "measure",
-              "formula": "case when ([B7178-539] = 0) then 1 else case when\n( ([B7178-539] , [F8B2C-86C]) <25000)   then 1  else 0 end end",
+              "formula": "SUM( RANK([DBAB7-BE8], \"DESC\", \"1234\", [183D2-7DF]))",
               "context": {
-                "[B7178-539]": {
-                  "table": "Financial History",
-                  "column": "Balance Amount",
-                  "dim": "[Financial History.Balance Amount]",
+                "[DBAB7-BE8]": {
+                  "table": "Claim Status History",
+                  "column": "CL_STATUS_ROW_ID",
+                  "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
                   "datatype": "numeric",
                   "agg": "sum",
-                  "title": "Total Balance Amount"
+                  "title": "Total CL_STATUS_ROW_ID"
                 },
-                "[F8B2C-86C]": {
-                  "table": "Reserve Current",
-                  "column": "Reserve Type Code",
-                  "dim": "[Reserve Current.Reserve Type Code]",
-                  "datatype": "text",
-                  "merged": true,
-                  "title": "Reserve Type Code",
-                  "filter": {
-                    "explicit": true,
-                    "multiSelection": true,
-                    "members": [
-                      "BI"
-                    ]
-                  },
-                  "collapsed": true,
-                  "datasource": {
-                    "address": "LocalHost",
-                    "title": "Florida P&L - Production - Financial - Jan 2025 0001",
-                    "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
-                    "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
-                    "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
-                    "live": false
-                  }
+                "[183D2-7DF]": {
+                  "table": "Claim Status History",
+                  "column": "CLAIM_ID",
+                  "dim": "[Claim Status History.CLAIM_ID]",
+                  "datatype": "numeric",
+                  "title": "CLAIM_ID"
                 }
               },
-              "title": "Formula",
+              "title": "RankAsOf",
               "datatype": "numeric",
               "filter": {
                 "equals": "1"
               },
+              "collapsed": false,
               "datasource": {
                 "address": "LocalHost",
                 "title": "Florida P&L - Production - Financial - Jan 2025 0001",
@@ -1734,10 +1884,9 @@
                 "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
                 "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
                 "live": false
-              },
-              "collapsed": false
+              }
             },
-            "instanceid": "A8E59-7E20-84",
+            "instanceid": "087B6-88DA-4E",
             "panel": "scope",
             "format": {
               "mask": {
@@ -1749,7 +1898,6 @@
                 "isdefault": true
               }
             },
-            "disabled": false,
             "handlers": [
               {}
             ]
@@ -1877,57 +2025,6 @@
           },
           {
             "jaql": {
-              "type": "measure",
-              "formula": "rank(sum([40C79-13D]),\"dsc\",\"1224\",[991E4-56E])",
-              "context": {
-                "[40C79-13D]": {
-                  "table": "Claim Status History",
-                  "column": "CL_STATUS_ROW_ID",
-                  "dim": "[Claim Status History.CL_STATUS_ROW_ID]",
-                  "datatype": "numeric",
-                  "title": "CL_STATUS_ROW_ID"
-                },
-                "[991E4-56E]": {
-                  "table": "Claim Status History",
-                  "column": "CLAIM_ID",
-                  "dim": "[Claim Status History.CLAIM_ID]",
-                  "datatype": "numeric",
-                  "title": "CLAIM_ID"
-                }
-              },
-              "datatype": "numeric",
-              "title": "Formula1",
-              "filter": {
-                "equals": "1"
-              },
-              "datasource": {
-                "address": "LocalHost",
-                "title": "Florida P&L - Production - Financial - Jan 2025 0001",
-                "id": "localhost_aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
-                "database": "aFloridaIAAaPJgAaLIAAaLQAaIAAaProductionIAAaLQAaIAAaFinancialIAAaLQAaIAAaJanIAAa2025IAAa0001",
-                "fullname": "localhost/Florida P&L - Production - Financial - Jan 2025 0001",
-                "live": false
-              },
-              "collapsed": false
-            },
-            "instanceid": "DBC20-B5AC-D8",
-            "panel": "scope",
-            "format": {
-              "mask": {
-                "type": "number",
-                "t": true,
-                "b": true,
-                "separated": true,
-                "decimals": "auto",
-                "isdefault": true
-              }
-            },
-            "handlers": [
-              {}
-            ]
-          },
-          {
-            "jaql": {
               "table": "Claim Status History",
               "column": "Date Status Changed",
               "dim": "[Claim Status History.Date Status Changed (Calendar)]",
@@ -2014,11 +2111,7 @@
             "panel": "scope"
           }
         ],
-        "m2mThresholdFlag": 0,
-        "isMaskedResult": true,
-        "widgetType": "pivot2",
-        "by": "widget",
-        "dashboard": "69bdb5c546a4e4003364528a;CBU-1803-Claimant_VEH_BI_Case_Eval_LT_25k_03182019_DXC"
+        "m2mThresholdFlag": 0
       },
       "waitingForUserTimezone": false,
       "wasRendered": false
