@@ -426,23 +426,6 @@ export default function AuditPage() {
     }
   };
 
-  if (!isAdminEnabled) {
-    return (
-      <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] text-slate-900">
-        <AppHeader
-          title="Dev Workspace"
-          subtitle="Admin access required."
-          backHref="/"
-        />
-        <main className="mx-auto max-w-4xl px-6 py-8">
-          <section className="rounded-[32px] border border-rose-200 bg-white p-6 text-sm text-rose-700 shadow-sm md:p-8">
-            Admin access is required to view the Dev Workspace.
-          </section>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eef4ff_100%)] text-slate-900">
       <AppHeader
@@ -459,7 +442,7 @@ export default function AuditPage() {
               onClick={() => setActiveTab('excel')}
               className={`rounded-xl px-4 py-2 ${resolvedActiveTab === 'excel' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
             >
-              File Compare
+              Report Compare with SAPBI
             </button>
             <button
               type="button"

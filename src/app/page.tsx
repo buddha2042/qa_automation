@@ -42,7 +42,6 @@ interface ActionCardProps {
 
 export default function QaLandingPage() {
   const router = useRouter();
-  const isAdminEnabled = (process.env.NEXT_PUBLIC_ADMIN ?? 'no').trim().toLowerCase() === 'yes';
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col relative overflow-hidden">
@@ -136,13 +135,11 @@ export default function QaLandingPage() {
             title="Dev"
             highlight="Workspace"
             highlightColor="text-sky-600"
-            desc="Open the audit workspace for file compare, widget inventory, function lookup, and table transfer."
-            btnText={isAdminEnabled ? 'Open Workspace' : 'Admin Only'}
+            desc="Open the audit workspace for Report Compare with SAPBI, widget inventory, function lookup, and table transfer."
+            btnText="Open Workspace"
             btnColor="bg-sky-600 shadow-sky-200 hover:bg-sky-700"
             hoverBorder="hover:border-sky-500 hover:shadow-sky-100"
             onClick={() => router.push('/audit')}
-            disabled={!isAdminEnabled}
-            disabledTitle={!isAdminEnabled ? 'Admin access required' : undefined}
           />
         </div>
 
