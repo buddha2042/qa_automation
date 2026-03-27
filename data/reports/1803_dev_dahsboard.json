@@ -40,21 +40,21 @@
                 ],
                 "width": 100,
                 "stretchable": false,
-                "pxlWidth": 1583,
+                "pxlWidth": 1449,
                 "index": 0
               }
             ]
           }
         ],
-        "pxlWidth": 1583,
+        "pxlWidth": 1449,
         "index": 0
       }
     ],
     "container": {
-      "sizzle1774047734332": {
+      "sizzle1774374377057": {
         "undefined": {
           "parentNode": [
-            118.30511378320605,
+            168.59019469091072,
             27,
             true
           ]
@@ -1188,14 +1188,12 @@
         "imageColumns": [],
         "selectorLocked": false,
         "availableExcludeDims": [
-          "[Claim Status History.CSH Status Code]",
-          "[Claim Status History.CSH Status Desc]",
+          "[Claim Status History.FPL Status]",
           "[Claim.Claim Number]",
           "[Region.Region Last Name]",
           "[Claim Status History.CSH O/C Status Code]",
           "[Claim Status History.CL_STATUS_ROW_ID]",
           "[Claim.Claim Status Desc]",
-          "[Claim Status History.FPL Status]",
           "[Reserve Current.Reserve Type Code]",
           "[Event.Event Category Desc]",
           "[Event.Event Type Code]",
