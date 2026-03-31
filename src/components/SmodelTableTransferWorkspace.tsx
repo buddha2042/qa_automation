@@ -8,6 +8,15 @@ interface SmodelTransferPreview {
   sourceDatasetName: string;
   targetDatasetName: string;
   targetTableFound: boolean;
+  sourceColumnCount: number;
+  previousTargetColumnCount: number;
+  updatedTargetColumnCount: number;
+  columnDiff: {
+    added: string[];
+    preservedTargetOnly: string[];
+    unchanged: string[];
+    renamed: Array<{ from: string; to: string }>;
+  };
   sourceTableJson: string;
   previousTargetTableJson: string;
   updatedTargetTableJson: string;
@@ -38,6 +47,55 @@ interface SmodelTableCandidate {
   tableType: string;
 }
 
+const formatTransferWarning = (warning: string) => warning.trim().replace(/\s+/g, ' ');
+
+const summarizeTransferWarnings = (warnings: string[]) => {
+  const notes: string[] = [];
+  const seen = new Set<string>();
+  const derivedColumnNotes: string[] = [];
+
+  for (const warning of warnings.map(formatTransferWarning)) {
+    if (
+      warning.startsWith('Skipped dont-import transformation for a removed column')
+      || warning.startsWith('Skipped change-data-type transformation for a removed column')
+      || warning.startsWith('Skipped rename-column transformation')
+    ) {
+      continue;
+    }
+
+    if (warning.startsWith('Skipped derived column "')) {
+      derivedColumnNotes.push(
+        warning
+          .replace(/^Skipped derived column /, '')
+          .replace(/ while transferring table .*? because /, ' could not be transferred because ')
+      );
+      continue;
+    }
+
+    if (warning.startsWith('Source joins were reviewed but not copied.')) {
+      continue;
+    }
+
+    if (warning.startsWith('Detected ') && warning.includes('malformed source relation')) {
+      continue;
+    }
+
+    if (!seen.has(warning)) {
+      seen.add(warning);
+      notes.push(warning);
+    }
+  }
+
+  for (const note of derivedColumnNotes) {
+    if (!seen.has(note)) {
+      seen.add(note);
+      notes.push(note);
+    }
+  }
+
+  return notes;
+};
+
 export default function SmodelTableTransferWorkspace({
   variant = 'standalone',
 }: {
@@ -54,15 +112,21 @@ export default function SmodelTableTransferWorkspace({
   const [targetMatches, setTargetMatches] = useState<SmodelTableCandidate[]>([]);
   const [selectedSourceKey, setSelectedSourceKey] = useState('');
   const [selectedTargetKey, setSelectedTargetKey] = useState('');
+  const [pendingModelText, setPendingModelText] = useState('');
+  const [selectedAddedColumns, setSelectedAddedColumns] = useState<string[]>([]);
+  const transferNotes = preview ? summarizeTransferWarnings(preview.warnings) : [];
 
   const canInspect = Boolean(sourceFile && targetFile && tableName.trim());
   const canRun = Boolean(sourceFile && targetFile && tableName.trim() && selectedSourceKey);
+  const canConfirm = Boolean(preview && pendingModelText);
   const isEmbedded = variant === 'embedded';
 
   const resetTransferState = () => {
     setError('');
     setSuccess('');
     setPreview(null);
+    setPendingModelText('');
+    setSelectedAddedColumns([]);
     setSourceMatches([]);
     setTargetMatches([]);
     setSelectedSourceKey('');
@@ -84,6 +148,7 @@ export default function SmodelTableTransferWorkspace({
     setError('');
     setSuccess('');
     setPreview(null);
+    setPendingModelText('');
 
     try {
       const formData = new FormData();
@@ -182,6 +247,77 @@ export default function SmodelTableTransferWorkspace({
       }
 
       setPreview(json.preview);
+      setPendingModelText(json.transformedModelText);
+      setSelectedAddedColumns(json.preview.columnDiff.added);
+      setSuccess(`Review the column changes for "${json.preview.tableName}" and confirm before downloading the transformed target model.`);
+    } catch (requestError) {
+      const message = requestError instanceof Error ? requestError.message : 'Failed to transfer the selected table.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleAddedColumn = (columnName: string) => {
+    setSelectedAddedColumns((current) =>
+      current.includes(columnName)
+        ? current.filter((entry) => entry !== columnName)
+        : [...current, columnName]
+    );
+  };
+
+  const handleConfirmDownload = async () => {
+    if (!sourceFile || !targetFile || !tableName.trim() || !selectedSourceKey || !preview) return;
+
+    const sourceSelection = parseSelectionKey(selectedSourceKey);
+    const targetSelection = selectedTargetKey ? parseSelectionKey(selectedTargetKey) : null;
+    if (!sourceSelection) {
+      setError('Select an exact source table before transferring.');
+      return;
+    }
+
+    const excludedAddedColumns = preview.columnDiff.added.filter((columnName) => !selectedAddedColumns.includes(columnName));
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('left', sourceFile);
+      formData.append('right', targetFile);
+      formData.append('tableName', tableName.trim());
+      formData.append('action', 'transfer');
+      formData.append('sourceDatasetIndex', String(sourceSelection.datasetIndex));
+      formData.append('sourceTableIndex', String(sourceSelection.tableIndex));
+      if (targetSelection) {
+        formData.append('targetDatasetIndex', String(targetSelection.datasetIndex));
+        formData.append('targetTableIndex', String(targetSelection.tableIndex));
+      }
+      for (const columnName of excludedAddedColumns) {
+        formData.append('excludedAddedColumnNames', columnName);
+      }
+
+      const response = await fetch('/api/excel/sisense/smodel-transfer-table', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const json = (await response.json()) as {
+        error?: string;
+        preview?: SmodelTransferPreview;
+        transformedModelText?: string;
+        suggestedFilename?: string;
+      };
+
+      if (!response.ok || !json.preview || !json.transformedModelText) {
+        throw new Error(json.error || 'Failed to transfer the selected table.');
+      }
+
+      setPreview(json.preview);
+      setPendingModelText(json.transformedModelText);
+      setSelectedAddedColumns(json.preview.columnDiff.added);
+
       const blob = new Blob([json.transformedModelText], { type: 'application/json;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -273,7 +409,7 @@ export default function SmodelTableTransferWorkspace({
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Upload size={16} />
-            {loading ? 'Transferring Table...' : 'Transfer Table and Download Smodel'}
+            {loading ? 'Preparing Transfer...' : 'Review Transfer'}
           </button>
         </div>
 
@@ -319,6 +455,58 @@ export default function SmodelTableTransferWorkspace({
 
       {preview ? (
         <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-700">Confirm Changes</p>
+                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">Review exactly what will change before download</h3>
+                <p className="mt-2 max-w-3xl text-sm text-slate-600">
+                  This transfer will update only the selected target table block. Review the real column names below, then confirm when you are comfortable proceeding.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleConfirmDownload}
+                disabled={!canConfirm}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Confirm and Download
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3">
+              <TransferStatCard label="Source Columns" value={String(preview.sourceColumnCount)} />
+              <TransferStatCard label="Current Target Columns" value={String(preview.previousTargetColumnCount)} />
+              <TransferStatCard label="New Target Columns" value={String(preview.updatedTargetColumnCount)} />
+            </div>
+
+            <div className="mt-5 grid gap-4 xl:grid-cols-4">
+              <TransferListCard
+                title="Columns To Add"
+                items={preview.columnDiff.added}
+                selectable
+                selectedItems={selectedAddedColumns}
+                onToggleItem={toggleAddedColumn}
+                emptyText="No new columns will be added."
+              />
+              <TransferRenameListCard
+                title="Columns Renamed"
+                items={preview.columnDiff.renamed}
+                emptyText="No matching columns were renamed."
+              />
+              <TransferListCard
+                title="Target Columns Preserved"
+                items={preview.columnDiff.preservedTargetOnly}
+                emptyText="No target-only columns needed to be preserved."
+              />
+              <TransferListCard
+                title="Columns Staying"
+                items={preview.columnDiff.unchanged}
+                emptyText="No matching column names were carried over."
+              />
+            </div>
+          </div>
+
           <div className="grid gap-3 md:grid-cols-3">
             <TransferStatCard label="Table" value={preview.tableName} />
             <TransferStatCard label="Source Dataset" value={preview.sourceDatasetName || '-'} />
@@ -327,18 +515,21 @@ export default function SmodelTableTransferWorkspace({
 
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <TransferStatCard label="Existing Target Table" value={preview.targetTableFound ? 'Yes' : 'No'} />
-            <TransferStatCard label="Source Joins" value={String(preview.sourceRelations.length)} />
             <TransferStatCard label="Previous Target Joins" value={String(preview.previousTargetRelationCount)} />
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <TransferStatCard label="Copied Joins" value={String(preview.copiedRelationCount)} />
             <TransferStatCard label="Updated Target Joins" value={String(preview.updatedTargetRelationCount)} />
           </div>
 
-          {preview.warnings.length ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              {preview.warnings.join(' ')}
+          {transferNotes.length ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-bold text-amber-950">Transfer notes</p>
+              <ul className="mt-2 space-y-2">
+                {transferNotes.map((warning, index) => (
+                  <li key={`${warning}-${index}`} className="flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" />
+                    <span>{warning}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
 
@@ -349,24 +540,6 @@ export default function SmodelTableTransferWorkspace({
               body={preview.previousTargetTableJson || 'Target table did not exist before transfer.'}
             />
             <TransferPreviewCard title="Updated Target Table Block" body={preview.updatedTargetTableJson} />
-          </div>
-
-          <div className="mt-6 grid gap-4 xl:grid-cols-3">
-            <TransferRelationCard
-              title="Source Table Joins"
-              relations={preview.sourceRelations}
-              emptyText="No source joins were found for the selected table."
-            />
-            <TransferRelationCard
-              title="Previous Target Joins"
-              relations={preview.previousTargetRelations}
-              emptyText="No existing target joins were attached to the overwritten table."
-            />
-            <TransferRelationCard
-              title="Copied Joins"
-              relations={preview.copiedRelations}
-              emptyText="No joins were copied into the target model."
-            />
           </div>
         </section>
       ) : null}
@@ -490,13 +663,64 @@ function TransferPreviewCard({ title, body }: { title: string; body: string }) {
   );
 }
 
-function TransferRelationCard({
+function TransferListCard({
   title,
-  relations,
+  items,
+  emptyText,
+  selectable = false,
+  selectedItems = [],
+  onToggleItem,
+}: {
+  title: string;
+  items: string[];
+  emptyText: string;
+  selectable?: boolean;
+  selectedItems?: string[];
+  onToggleItem?: (item: string) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{title}</p>
+      </div>
+      {items.length ? (
+        <div className="max-h-[18rem] overflow-auto px-4 py-4">
+          <ul className="space-y-2 text-sm text-slate-700">
+            {items.map((item) => (
+              selectable ? (
+                <li key={item}>
+                  <label className="flex items-start gap-3 rounded-xl bg-slate-50 px-3 py-2 font-medium">
+                    <input
+                      type="checkbox"
+                      checked={selectedItems.includes(item)}
+                      onChange={() => onToggleItem?.(item)}
+                      className="mt-1"
+                    />
+                    <span>{item}</span>
+                  </label>
+                </li>
+              ) : (
+                <li key={item} className="rounded-xl bg-slate-50 px-3 py-2 font-medium">
+                  {item}
+                </li>
+              )
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div className="px-4 py-4 text-sm text-slate-500">{emptyText}</div>
+      )}
+    </div>
+  );
+}
+
+function TransferRenameListCard({
+  title,
+  items,
   emptyText,
 }: {
   title: string;
-  relations: SmodelTransferRelationPreview[];
+  items: Array<{ from: string; to: string }>;
   emptyText: string;
 }) {
   return (
@@ -504,19 +728,15 @@ function TransferRelationCard({
       <div className="border-b border-slate-200 px-4 py-3">
         <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{title}</p>
       </div>
-      {relations.length ? (
-        <div className="max-h-[28rem] space-y-3 overflow-auto bg-slate-50 p-4">
-          {relations.map((relation, index) => (
-            <div key={`${relation.relationOid || 'relation'}-${index}`} className="rounded-2xl border border-slate-200 bg-white">
-              <div className="border-b border-slate-200 px-4 py-3">
-                <p className="text-xs font-bold text-slate-900">{relation.summary || 'Join identified'}</p>
-                <p className="mt-1 text-[11px] text-slate-500">
-                  OID: {relation.relationOid || '-'} | Type: {relation.relationType || '-'}
-                </p>
-              </div>
-              <pre className="overflow-auto bg-slate-950 px-4 py-4 text-xs text-slate-100">{relation.json}</pre>
-            </div>
-          ))}
+      {items.length ? (
+        <div className="max-h-[18rem] overflow-auto px-4 py-4">
+          <ul className="space-y-2 text-sm text-slate-700">
+            {items.map((item) => (
+              <li key={`${item.from}->${item.to}`} className="rounded-xl bg-slate-50 px-3 py-2 font-medium">
+                {item.from} {'->'} {item.to}
+              </li>
+            ))}
+          </ul>
         </div>
       ) : (
         <div className="px-4 py-4 text-sm text-slate-500">{emptyText}</div>

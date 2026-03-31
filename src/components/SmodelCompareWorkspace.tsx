@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowDownUp, Database } from 'lucide-react';
 
 interface PythonSmodelMetadataRow {
   source_file?: string | null;
+  database?: string | null;
   dataset_name?: string | null;
   schemaName?: string | null;
   dataset_id?: string | null;
@@ -78,6 +79,7 @@ interface PythonSmodelCustomFieldRow {
 
 interface SmodelColumnRow {
   key: string;
+  database: string;
   datasetId: string;
   datasetName: string;
   schemaName: string;
@@ -99,6 +101,7 @@ interface SmodelColumnRow {
 
 interface SmodelCompareRow {
   key: string;
+  database: string;
   datasetId: string;
   datasetName: string;
   schemaName: string;
@@ -205,6 +208,12 @@ const normalizeSmodelKeyPart = (value: unknown): string =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const buildScopedSmodelKeyPart = (...values: unknown[]) =>
+  values
+    .map((value) => normalizeSmodelKeyPart(value))
+    .filter(Boolean)
+    .join('||');
+
 const escapeXml = (value: unknown) =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -222,6 +231,8 @@ const toDownloadSafeName = (value: string) =>
     .slice(0, 80) || 'model';
 
 const buildSmodelTableLookupKey = (parts: {
+  database?: unknown;
+  schemaName?: unknown;
   tableName?: unknown;
   tableId?: unknown;
 }) =>
@@ -246,6 +257,8 @@ const formatSummaryList = (value: unknown) => {
   }
   return toSmodelText(value);
 };
+
+const getRowDatabase = (row: Record<string, unknown>) => toSmodelText(row.database);
 
 const getFirstMatchingFieldText = (row: Record<string, unknown>, prefixes: string[]) => {
   const matchingField = Object.keys(row).find((field) => prefixes.some((prefix) => field.startsWith(prefix)));
@@ -364,7 +377,7 @@ const buildSmodelTableSummaries = (
   };
 
   for (const row of sheets.COLUMN_SUMMARY ?? []) {
-    const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
+    const key = buildSmodelTableLookupKey({ database: getRowDatabase(row as Record<string, unknown>), schemaName: row.schemaName, tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
     summary.columnCountModelA = getNumberField(row as Record<string, unknown>, `column_count_in_${modelAName}`);
     summary.columnCountModelB = getNumberField(row as Record<string, unknown>, `column_count_in_${modelBName}`);
@@ -380,7 +393,7 @@ const buildSmodelTableSummaries = (
   }
 
   for (const row of sheets.JOIN_SUMMARY ?? []) {
-    const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
+    const key = buildSmodelTableLookupKey({ database: getRowDatabase(row as Record<string, unknown>), schemaName: row.schemaName, tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
     const relationGroupsFieldA = `relation_groups_in_${leftSourceLabel}`;
     const relationGroupsFieldB = `relation_groups_in_${rightSourceLabel}`;
@@ -417,8 +430,18 @@ const buildSmodelTableSummaries = (
     const rightTableName = toSmodelText(row.right_table);
     const rightTableId = toSmodelText(row.right_table_id);
     const rightColumn = toSmodelText(row.right_column);
-    const leftKey = buildSmodelTableLookupKey({ tableName: leftTableName, tableId: leftTableId });
-    const rightKey = buildSmodelTableLookupKey({ tableName: rightTableName, tableId: rightTableId });
+    const leftKey = buildSmodelTableLookupKey({
+      database: (row as Record<string, unknown>).left_database,
+      schemaName: (row as Record<string, unknown>).left_schema,
+      tableName: leftTableName,
+      tableId: leftTableId,
+    });
+    const rightKey = buildSmodelTableLookupKey({
+      database: (row as Record<string, unknown>).right_database,
+      schemaName: (row as Record<string, unknown>).right_schema,
+      tableName: rightTableName,
+      tableId: rightTableId,
+    });
     const leftTarget = [rightTableName || rightTableId, rightColumn].filter(Boolean).join('.');
     const rightTarget = [leftTableName || leftTableId, leftColumn].filter(Boolean).join('.');
 
@@ -440,7 +463,7 @@ const buildSmodelTableSummaries = (
   }
 
   for (const row of sheets.TABLE_QUERIES ?? []) {
-    const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
+    const key = buildSmodelTableLookupKey({ database: getRowDatabase(row as Record<string, unknown>), schemaName: row.schemaName, tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
     summary.tableQueryDiff = getBooleanField(row.is_different);
     summary.leftTableQuery =
@@ -452,7 +475,7 @@ const buildSmodelTableSummaries = (
   }
 
   for (const row of sheets.CUSTOM_TABLES ?? []) {
-    const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
+    const key = buildSmodelTableLookupKey({ database: getRowDatabase(row as Record<string, unknown>), schemaName: row.schemaName, tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
     summary.tableQueryDiff = summary.tableQueryDiff || getBooleanField(row.is_different);
     summary.leftTableQuery =
@@ -464,7 +487,7 @@ const buildSmodelTableSummaries = (
   }
 
   for (const row of sheets.HIDDEN_COLUMNS ?? []) {
-    const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
+    const key = buildSmodelTableLookupKey({ database: getRowDatabase(row as Record<string, unknown>), schemaName: row.schemaName, tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
     const diffField = Object.keys(row).find((field) => field.startsWith('diff_count_in_'));
     summary.hiddenTotalModelA = getNumberField(row as Record<string, unknown>, 'hidden_total_in_model_a');
@@ -476,7 +499,7 @@ const buildSmodelTableSummaries = (
   }
 
   for (const row of sheets.DATATYPES ?? []) {
-    const key = buildSmodelTableLookupKey({ tableName: row.table_name, tableId: row.table_id });
+    const key = buildSmodelTableLookupKey({ database: getRowDatabase(row as Record<string, unknown>), schemaName: row.schemaName, tableName: row.table_name, tableId: row.table_id });
     const summary = getSummary(key);
     const diffField = Object.keys(row).find((field) => field.startsWith('diff_count_in_'));
     summary.datatypeDiffSummaryModelA = formatSummaryList(row.column_names_in_model_a);
@@ -521,11 +544,11 @@ const buildSmodelCompareRows = (
   const rightTableMap = new Map<string, SmodelColumnRow[]>();
 
   for (const row of leftRows) {
-    const key = buildSmodelTableLookupKey({ tableName: row.tableName, tableId: row.tableId });
+    const key = buildSmodelTableLookupKey({ database: row.database, schemaName: row.schemaName, tableName: row.tableName, tableId: row.tableId });
     leftTableMap.set(key, [...(leftTableMap.get(key) ?? []), row]);
   }
   for (const row of rightRows) {
-    const key = buildSmodelTableLookupKey({ tableName: row.tableName, tableId: row.tableId });
+    const key = buildSmodelTableLookupKey({ database: row.database, schemaName: row.schemaName, tableName: row.tableName, tableId: row.tableId });
     rightTableMap.set(key, [...(rightTableMap.get(key) ?? []), row]);
   }
 
@@ -558,6 +581,7 @@ const buildSmodelCompareRows = (
 
     return {
       key,
+      database: left?.database || right?.database || '',
       datasetId: left?.datasetId || right?.datasetId || '',
       datasetName: left?.datasetName || right?.datasetName || '',
       schemaName: left?.schemaName || right?.schemaName || '',
@@ -621,7 +645,11 @@ const buildSmodelRowsFromPythonMetadata = (
   const tableSummaries = buildSmodelTableSummaries(sheets, modelAName, modelBName, leftLabel, rightLabel);
   const normalize = (value: unknown) => toSmodelText(value);
   const toComparable = (row: PythonSmodelMetadataRow): SmodelColumnRow => ({
-    key: [normalizeSmodelKeyPart(row.table_name || row.table_id), normalizeSmodelKeyPart(row.column_name || row.column_id)].join('|'),
+    key: [
+      buildScopedSmodelKeyPart(row.database, row.schemaName, row.table_name || row.table_id),
+      normalizeSmodelKeyPart(row.column_name || row.column_id),
+    ].join('|'),
+    database: normalize(row.database),
     datasetId: normalize(row.dataset_id),
     datasetName: normalize(row.dataset_name),
     schemaName: normalize(row.schemaName),
@@ -658,6 +686,7 @@ export default function SmodelCompareWorkspace() {
   const [smodelModelALabel, setSmodelModelALabel] = useState('Model A');
   const [smodelModelBLabel, setSmodelModelBLabel] = useState('Model B');
   const [selectedQueryPreviewKey, setSelectedQueryPreviewKey] = useState('');
+  const [selectedJoinPreviewKey, setSelectedJoinPreviewKey] = useState('');
 
   const canRunSmodelCompare = Boolean(smodelLeftFile && smodelRightFile);
   const visibleSmodelRows = smodelRows
@@ -684,6 +713,10 @@ export default function SmodelCompareWorkspace() {
   const selectedQueryPreviewRow =
     visibleSmodelRows.find((row) => row.key === selectedQueryPreviewKey) ??
     smodelRows.find((row) => row.key === selectedQueryPreviewKey) ??
+    null;
+  const selectedJoinPreviewRow =
+    visibleSmodelRows.find((row) => row.key === selectedJoinPreviewKey) ??
+    smodelRows.find((row) => row.key === selectedJoinPreviewKey) ??
     null;
   const selectedLeftQueryPreview = selectedQueryPreviewRow
     ? selectedQueryPreviewRow.leftTableQuery || buildDefaultTableQuery(selectedQueryPreviewRow.schemaName, selectedQueryPreviewRow.tableName)
@@ -741,6 +774,7 @@ export default function SmodelCompareWorkspace() {
       setSmodelRows(nextRows);
       setSmodelSearch('');
       setSelectedQueryPreviewKey(nextRows[0]?.key ?? '');
+      setSelectedJoinPreviewKey(nextRows.find((row) => row.joinFieldsModelA || row.joinFieldsModelB)?.key ?? '');
       setSmodelFilter('all');
 
       const formData = new FormData();
@@ -905,43 +939,26 @@ export default function SmodelCompareWorkspace() {
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">{row.droppedFieldCountModelB}</td>
                     <td className="border border-slate-200 px-3 py-2 align-top text-slate-700">
                       {row.joinFieldsModelA || row.joinFieldsModelB ? (
-                        <div className="min-w-[24rem] max-w-[32rem] space-y-3">
-                          {row.joinFieldsModelA ? (
-                            <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2">
-                              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">Model A</p>
-                              <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-700">
-                                Direct Relationships: {row.joinCountModelA}
-                              </p>
-                              <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-700">
-                                Joined Keys Internally: {summarizeJoinKeys(row.joinFieldsModelA).join(', ') || '-'}
-                              </p>
-                              <div className="mt-1 space-y-1">
-                                {splitJoinFieldDetails(row.joinFieldsModelA).map((item) => (
-                                  <div key={`a-${row.key}-${item}`} className="rounded-md bg-white/80 px-2 py-1 font-mono text-[11px] leading-5 text-slate-700">
-                                    {item}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                          {row.joinFieldsModelB ? (
-                            <div className="rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2">
-                              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-700">Model B</p>
-                              <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-700">
-                                Direct Relationships: {row.joinCountModelB}
-                              </p>
-                              <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-700">
-                                Joined Keys Internally: {summarizeJoinKeys(row.joinFieldsModelB).join(', ') || '-'}
-                              </p>
-                              <div className="mt-1 space-y-1">
-                                {splitJoinFieldDetails(row.joinFieldsModelB).map((item) => (
-                                  <div key={`b-${row.key}-${item}`} className="rounded-md bg-white/80 px-2 py-1 font-mono text-[11px] leading-5 text-slate-700">
-                                    {item}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
+                        <div className="min-w-[18rem] max-w-[24rem] space-y-2">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                            <p className="text-[11px] font-semibold leading-5 text-slate-700">
+                              Model A: {splitJoinFieldDetails(row.joinFieldsModelA).length} links, {summarizeJoinKeys(row.joinFieldsModelA).length} keys
+                            </p>
+                            <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-700">
+                              Model B: {splitJoinFieldDetails(row.joinFieldsModelB).length} links, {summarizeJoinKeys(row.joinFieldsModelB).length} keys
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedJoinPreviewKey(row.key)}
+                            className={`rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] transition ${
+                              selectedJoinPreviewKey === row.key
+                                ? 'bg-slate-900 text-white'
+                                : 'border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                            }`}
+                          >
+                            Inspect
+                          </button>
                         </div>
                       ) : (
                         '-'
@@ -1014,10 +1031,6 @@ export default function SmodelCompareWorkspace() {
                   <pre className="mt-3 max-h-80 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100 whitespace-pre-wrap break-words">
                     {selectedLeftQueryPreview || 'No table query found in Model A for this table.'}
                   </pre>
-                  <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Table Expression</p>
-                  <pre className="mt-3 max-h-48 overflow-auto rounded-2xl bg-slate-100 p-4 text-xs leading-6 text-slate-700 whitespace-pre-wrap break-words">
-                    {selectedQueryPreviewRow.leftTableExpression || 'No table expression found in Model A.'}
-                  </pre>
                 </div>
 
                 <div className="rounded-[24px] border border-sky-200 bg-white p-4 shadow-sm">
@@ -1026,10 +1039,57 @@ export default function SmodelCompareWorkspace() {
                   <pre className="mt-3 max-h-80 overflow-auto rounded-2xl bg-slate-950 p-4 text-xs leading-6 text-slate-100 whitespace-pre-wrap break-words">
                     {selectedRightQueryPreview || 'No table query found in Model B for this table.'}
                   </pre>
-                  <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Table Expression</p>
-                  <pre className="mt-3 max-h-48 overflow-auto rounded-2xl bg-slate-100 p-4 text-xs leading-6 text-slate-700 whitespace-pre-wrap break-words">
-                    {selectedQueryPreviewRow.rightTableExpression || 'No table expression found in Model B.'}
-                  </pre>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedJoinPreviewRow ? (
+            <div className="border-t border-slate-200 bg-slate-50/70 px-6 py-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-600">Joined Keys Preview</p>
+                  <h4 className="mt-1 text-lg font-black tracking-tight text-slate-900">{selectedJoinPreviewRow.tableName || 'Selected Table'}</h4>
+                  <p className="mt-1 text-sm text-slate-500">Internal joined-key details from both models, shown below the table for easier review.</p>
+                </div>
+                <div className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-sm">
+                  Direct relationships: {selectedJoinPreviewRow.joinCountModelA} vs {selectedJoinPreviewRow.joinCountModelB}
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                <div className="rounded-[24px] border border-blue-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600">{smodelModelALabel}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">Joined Keys Internally: {summarizeJoinKeys(selectedJoinPreviewRow.joinFieldsModelA).join(', ') || '-'}</p>
+                  <p className="mt-1 text-sm text-slate-500">Direct Relationships: {selectedJoinPreviewRow.joinCountModelA}</p>
+                  <div className="mt-3 space-y-2">
+                    {splitJoinFieldDetails(selectedJoinPreviewRow.joinFieldsModelA).length ? (
+                      splitJoinFieldDetails(selectedJoinPreviewRow.joinFieldsModelA).map((item) => (
+                        <div key={`join-preview-a-${selectedJoinPreviewRow.key}-${item}`} className="rounded-md bg-blue-50 px-3 py-2 font-mono text-[12px] leading-5 text-slate-700">
+                          {item}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500">No internal joined keys in Model A.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-[24px] border border-sky-200 bg-white p-4 shadow-sm">
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-600">{smodelModelBLabel}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">Joined Keys Internally: {summarizeJoinKeys(selectedJoinPreviewRow.joinFieldsModelB).join(', ') || '-'}</p>
+                  <p className="mt-1 text-sm text-slate-500">Direct Relationships: {selectedJoinPreviewRow.joinCountModelB}</p>
+                  <div className="mt-3 space-y-2">
+                    {splitJoinFieldDetails(selectedJoinPreviewRow.joinFieldsModelB).length ? (
+                      splitJoinFieldDetails(selectedJoinPreviewRow.joinFieldsModelB).map((item) => (
+                        <div key={`join-preview-b-${selectedJoinPreviewRow.key}-${item}`} className="rounded-md bg-sky-50 px-3 py-2 font-mono text-[12px] leading-5 text-slate-700">
+                          {item}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-500">No internal joined keys in Model B.</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
