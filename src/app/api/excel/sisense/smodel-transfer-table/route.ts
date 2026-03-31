@@ -40,12 +40,14 @@ export async function POST(request: Request) {
     const sourceTableIndex = Number(formData.get('sourceTableIndex'));
     const rawTargetDatasetIndex = formData.get('targetDatasetIndex');
     const rawTargetTableIndex = formData.get('targetTableIndex');
+    const excludedAddedColumnNames = formData.getAll('excludedAddedColumnNames').map((value) => String(value).trim()).filter(Boolean);
 
     const result = transferSmodelTable(sourceModel, targetModel, tableName, {
       sourceDatasetIndex: Number.isInteger(sourceDatasetIndex) ? sourceDatasetIndex : undefined,
       sourceTableIndex: Number.isInteger(sourceTableIndex) ? sourceTableIndex : undefined,
       targetDatasetIndex: rawTargetDatasetIndex === null || String(rawTargetDatasetIndex).trim() === '' ? undefined : Number(rawTargetDatasetIndex),
       targetTableIndex: rawTargetTableIndex === null || String(rawTargetTableIndex).trim() === '' ? undefined : Number(rawTargetTableIndex),
+      excludedAddedColumnNames,
     });
     const sourceBaseName = leftFile.name.replace(/\.[^/.]+$/, '') || 'source';
     const targetBaseName = rightFile.name.replace(/\.[^/.]+$/, '') || 'target';
