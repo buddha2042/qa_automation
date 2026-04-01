@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { runPythonScript } from '@/lib/pythonRuntime';
 
 export interface SmodelCompareRunResult {
   outputPath: string;
@@ -38,50 +38,25 @@ export async function runSmodelCompare(
 ): Promise<SmodelCompareRunResult> {
   const scriptPath = path.join(process.cwd(), 'scripts', 'sisense_smodel_comparison_extract.py');
   const outputPath = path.join(os.tmpdir(), `smodel-compare-${randomUUID()}.xlsx`);
-  const venvPythonPath = path.join(process.cwd(), '.venv', 'bin', 'python3');
-  const pythonCommand = await fs
-    .access(venvPythonPath)
-    .then(() => venvPythonPath)
-    .catch(() => 'python3');
-  const args = [scriptPath, modelAPath, modelBPath, '--out', outputPath];
-  if (jsonOutputPath) {
-    args.push('--json-out', jsonOutputPath);
+  const { code, stdout, stderr } = await runPythonScript(scriptPath, [
+    modelAPath,
+    modelBPath,
+    '--out',
+    outputPath,
+    ...(jsonOutputPath ? ['--json-out', jsonOutputPath] : []),
+  ]);
+
+  if (code !== 0) {
+    throw new Error(
+      stderr || stdout || 'Sisense smodel comparison failed. Install Python 3.10+ or run `npm run setup:python`.'
+    );
   }
 
-  return new Promise<SmodelCompareRunResult>((resolve, reject) => {
-    const child = spawn(pythonCommand, args, {
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+  try {
+    await fs.access(outputPath);
+  } catch {
+    throw new Error('Comparison script completed but output file was not created.');
+  }
 
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => {
-      reject(new Error(error.message));
-    });
-
-    child.on('close', async (code) => {
-      if (code !== 0) {
-        reject(new Error(stderr || stdout || 'Sisense smodel comparison failed.'));
-        return;
-      }
-
-      try {
-        await fs.access(outputPath);
-      } catch {
-        reject(new Error('Comparison script completed but output file was not created.'));
-        return;
-      }
-
-      resolve({ outputPath, jsonOutputPath, stdout, stderr });
-    });
-  });
+  return { outputPath, jsonOutputPath, stdout, stderr };
 }
