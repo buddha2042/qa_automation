@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { runPythonScript } from '@/lib/pythonRuntime';
 
 export interface ColumnMapping {
   left: string;
@@ -112,61 +112,35 @@ export async function cleanupTempFiles(paths: Array<string | undefined | null>):
 
 export async function runExcelAudit<T>(payload: object): Promise<RunResult<T>> {
   const scriptPath = path.join(process.cwd(), 'scripts', 'excel_audit.py');
+  const { code, stdout, stderr } = await runPythonScript(scriptPath, [], JSON.stringify(payload));
 
-  return new Promise<RunResult<T>>((resolve) => {
-    const child = spawn('python3', [scriptPath], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+  let parsed: ({ error?: string } & T) | null = null;
 
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on('error', (error) => {
-      resolve({
+  try {
+    parsed = JSON.parse(stdout || '{}') as { error?: string } & T;
+  } catch {
+    if (code === 0) {
+      return {
         ok: false,
-        error: error.message,
-        rawOutput: stderr || stdout,
-      });
-    });
+        error: stderr || 'Failed to parse spreadsheet analysis output.',
+        rawOutput: stdout,
+      };
+    }
+  }
 
-    child.on('close', (code) => {
-      let parsed: { error?: string } & T;
+  if (code !== 0 || parsed?.error) {
+    return {
+      ok: false,
+      error:
+        parsed?.error ||
+        stderr ||
+        'Spreadsheet analysis failed. Install Python 3.10+ or run `npm run setup:python` to create the local runtime.',
+      rawOutput: stdout,
+    };
+  }
 
-      try {
-        parsed = JSON.parse(stdout || '{}') as { error?: string } & T;
-      } catch {
-        resolve({
-          ok: false,
-          error: stderr || 'Failed to parse spreadsheet analysis output.',
-          rawOutput: stdout,
-        });
-        return;
-      }
-
-      if (code !== 0 || parsed.error) {
-        resolve({
-          ok: false,
-          error: parsed.error || stderr || 'Spreadsheet analysis failed.',
-          rawOutput: stdout,
-        });
-        return;
-      }
-
-      resolve({
-        ok: true,
-        data: parsed,
-      });
-    });
-
-    child.stdin.write(JSON.stringify(payload));
-    child.stdin.end();
-  });
+  return {
+    ok: true,
+    data: (parsed ?? ({} as T)),
+  };
 }
