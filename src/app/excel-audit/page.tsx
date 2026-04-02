@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import AppHeader from '@/components/AppHeader';
 import SisenseUserDashboardInventory from '@/components/SisenseUserDashboardInventory';
 import SmodelTableTransferWorkspace from '@/components/SmodelTableTransferWorkspace';
+import SupplementalFieldsWorkspace from '@/components/SupplementalFieldsWorkspace';
 import type { ColumnMapping, CompareResult, WorkbookData, WorkbookSummary } from '@/lib/excelAudit';
 import { SISENSE_BASE_URLS } from '@/lib/sisenseEnvironments';
 import { AlertTriangle, ArrowDownUp, ChevronDown, ChevronUp, Database, FileSpreadsheet, RefreshCcw, Upload } from 'lucide-react';
@@ -95,12 +96,19 @@ const isEquivalentCellForUi = (left: string, right: string) => {
 const EXCEL_AUDIT_SISENSE_STORAGE_KEY = 'excel-audit-sisense-config';
 
 export default function AuditPage() {
-  const [activeTab, setActiveTab] = useState<'excel' | 'widget-inventory' | 'function-inventory' | 'table-transfer'>('excel');
+  const [activeTab, setActiveTab] = useState<
+    'excel' | 'widget-inventory' | 'function-inventory' | 'table-transfer' | 'supplemental-fields'
+  >('excel');
   const isAdminEnabled = (process.env.NEXT_PUBLIC_ADMIN ?? 'no').trim().toLowerCase() === 'yes';
   const canAccessRestrictedTabs = isAdminEnabled;
   const resolvedActiveTab =
     !canAccessRestrictedTabs &&
-    (activeTab === 'widget-inventory' || activeTab === 'function-inventory' || activeTab === 'table-transfer')
+    (
+      activeTab === 'widget-inventory' ||
+      activeTab === 'function-inventory' ||
+      activeTab === 'table-transfer' ||
+      activeTab === 'supplemental-fields'
+    )
       ? 'excel'
       : activeTab;
   const [leftFile, setLeftFile] = useState<File | null>(null);
@@ -497,6 +505,24 @@ export default function AuditPage() {
               }`}
             >
               Table Transfer
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (canAccessRestrictedTabs) setActiveTab('supplemental-fields');
+              }}
+              disabled={!canAccessRestrictedTabs}
+              aria-disabled={!canAccessRestrictedTabs}
+              title={!canAccessRestrictedTabs ? 'Admin access required' : undefined}
+              className={`rounded-xl px-4 py-2 transition ${
+                resolvedActiveTab === 'supplemental-fields'
+                  ? 'bg-slate-900 text-white'
+                  : canAccessRestrictedTabs
+                    ? 'text-slate-600'
+                    : 'cursor-not-allowed text-slate-300'
+              }`}
+            >
+              Supplemental Fields
             </button>
           </div>
         </section>
@@ -930,6 +956,8 @@ export default function AuditPage() {
           />
         ) : resolvedActiveTab === 'table-transfer' ? (
           <SmodelTableTransferWorkspace variant="embedded" />
+        ) : resolvedActiveTab === 'supplemental-fields' ? (
+          <SupplementalFieldsWorkspace variant="embedded" />
         ) : (
           <SisenseUserDashboardInventory
             initialBaseUrl={masterInspectorConfig.baseUrl}
