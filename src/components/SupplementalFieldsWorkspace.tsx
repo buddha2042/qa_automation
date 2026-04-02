@@ -327,10 +327,10 @@ export default function SupplementalFieldsWorkspace({
               Supplemental Sync
             </p>
             <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">
-              Add supplemental fields into a Sisense cube
+              Sync a supplemental table into a Sisense cube
             </h2>
             <p className="mt-2 max-w-3xl text-sm text-slate-500">
-              Load the supplemental catalog, compare it against the selected datamodel table, and apply only the missing fields before triggering a fresh build.
+              Load the supplemental catalog, compare the selected supplemental table against the datamodel table, and apply only the missing fields before triggering a fresh build.
             </p>
           </div>
           <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
@@ -518,7 +518,7 @@ export default function SupplementalFieldsWorkspace({
                 className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-200 disabled:opacity-60"
               >
                 {previewLoading ? <LoaderCircle size={16} className="animate-spin" /> : <Wrench size={16} />}
-                {previewLoading ? 'Inspecting...' : 'Load Supplemental Fields'}
+                {previewLoading ? 'Inspecting...' : 'Load Supplemental Table'}
               </button>
             </div>
           </div>

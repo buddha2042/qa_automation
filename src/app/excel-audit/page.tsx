@@ -22,7 +22,7 @@ const TAB_OPTIONS: Array<{ id: AuditTab; label: string; access: 'admin' | 'super
   { id: 'user-lookup', label: 'User Lookup', access: 'super-admin' },
   { id: 'dashboard-transfer', label: 'Dashboard Transfer', access: 'super-admin' },
   { id: 'table-transfer', label: 'Table Transfer', access: 'admin' },
-  { id: 'supplemental-fields', label: 'Supplemental Fields', access: 'admin' },
+  { id: 'supplemental-fields', label: 'Supplemental Table', access: 'super-admin' },
 ];
 
 export default function AuditPage() {
@@ -84,15 +84,15 @@ export default function AuditPage() {
             <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-500">Access Restricted</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Admin access required</h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Table transfer and supplemental fields are available only for admin users. Widget inventory, function lookup, user lookup, and dashboard transfer require super admin access.
+              Table transfer is available only for admin users. Widget inventory, function lookup, user lookup, dashboard transfer, and supplemental table require super admin access.
             </p>
           </section>
-        ) : !isSuperAdminEnabled && resolvedActiveTab !== 'table-transfer' && resolvedActiveTab !== 'supplemental-fields' ? (
+        ) : !isSuperAdminEnabled && resolvedActiveTab !== 'table-transfer' ? (
           <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
             <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-500">Access Restricted</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Super admin access required</h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Widget inventory, function lookup, user lookup, and dashboard transfer are available only for super admin users. Table transfer and supplemental fields remain available for admin users.
+              Widget inventory, function lookup, user lookup, dashboard transfer, and supplemental table are available only for super admin users. Table transfer remains available for admin users.
             </p>
           </section>
         ) : resolvedActiveTab === 'widget-inventory' ? (
