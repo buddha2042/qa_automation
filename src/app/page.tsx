@@ -40,8 +40,84 @@ interface ActionCardProps {
   disabledTitle?: string;
 }
 
+interface LandingAction {
+  title: string;
+  highlight?: string;
+  highlightColor: string;
+  desc: string;
+  btnText: string;
+  btnColor: string;
+  hoverBorder: string;
+  onClick: () => void;
+  disabled?: boolean;
+  disabledTitle?: string;
+}
+
 export default function QaLandingPage() {
   const router = useRouter();
+
+  const actionCards: LandingAction[] = [
+    {
+      title: 'Master',
+      highlight: 'Informer',
+      highlightColor: 'text-slate-400',
+      desc: 'List dashboards under each environment, review dashboard IDs, and trace widget IDs in one clean inventory view.',
+      btnText: 'Open Viewer',
+      btnColor: 'bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700',
+      hoverBorder: 'hover:border-slate-400 hover:shadow-slate-200',
+      onClick: () => router.push('/dashfile'),
+    },
+    {
+      title: 'Smodel',
+      highlight: 'Inspector',
+      highlightColor: 'text-cyan-600',
+      desc: 'Open the Sisense model comparison workspace directly and inspect structural model differences in a focused review flow.',
+      btnText: 'Open Inspector',
+      btnColor: 'bg-cyan-600 shadow-cyan-200 hover:bg-cyan-700',
+      hoverBorder: 'hover:border-cyan-500 hover:shadow-cyan-100',
+      onClick: () => router.push('/smodel-inspector'),
+    },
+    {
+      title: 'Dashboard',
+      highlight: 'Inspector',
+      highlightColor: 'text-indigo-600',
+      desc: 'Set dashboard-level credentials, review environment connections, and bootstrap the cross-environment compare run.',
+      btnText: 'Start Setup',
+      btnColor: 'bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700',
+      hoverBorder: 'hover:border-indigo-500 hover:shadow-indigo-100',
+      onClick: () => router.push('/dashboard'),
+    },
+    {
+      title: 'Widget',
+      highlight: 'Inspector',
+      highlightColor: 'text-blue-600',
+      desc: 'Run widget-level structural compare, review payload differences, and continue into detailed audit output checks.',
+      btnText: 'Check Widget',
+      btnColor: 'bg-blue-600 shadow-blue-200 hover:bg-blue-700',
+      hoverBorder: 'hover:border-blue-500 hover:shadow-blue-100',
+      onClick: () => router.push('/widget'),
+    },
+    {
+      title: 'Report',
+      highlight: 'Compare',
+      highlightColor: 'text-violet-600',
+      desc: 'Compare SAPBI exports against vendor files or connected Sisense widget data in a dedicated comparison workspace.',
+      btnText: 'Open Compare',
+      btnColor: 'bg-violet-600 shadow-violet-200 hover:bg-violet-700',
+      hoverBorder: 'hover:border-violet-500 hover:shadow-violet-100',
+      onClick: () => router.push('/report-compare'),
+    },
+    {
+      title: 'Dev',
+      highlight: 'Workspace',
+      highlightColor: 'text-sky-600',
+      desc: 'Open the audit workspace for widget inventory, function lookup, user lookup, dashboard transfer, and table transfer tasks.',
+      btnText: 'Open Workspace',
+      btnColor: 'bg-sky-600 shadow-sky-200 hover:bg-sky-700',
+      hoverBorder: 'hover:border-sky-500 hover:shadow-sky-100',
+      onClick: () => router.push('/audit'),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col relative overflow-hidden">
@@ -81,67 +157,20 @@ export default function QaLandingPage() {
             Data <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-500">Integrity Studio</span>
           </h1>
 
-          <p className="text-slate-500 text-sm md:text-base max-w-lg mx-auto font-medium leading-relaxed opacity-80">
-            Automated QA tester and validation inspector for Sisense dashboard and widget environments.
+          <p className="text-slate-500 text-sm md:text-base max-w-3xl mx-auto font-medium leading-relaxed opacity-80">
+            Automated QA, audit, and admin operations studio for Sisense environments across dashboards, widgets, reports, users, ownership transfer, and model workflows.
           </p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-5 mb-20">
-          <ActionCard
-            title="Master"
-            highlight="Informer"
-            highlightColor="text-slate-400"
-            desc="List dashboards under each environment, including dashboard IDs and widget IDs."
-            btnText="Open Viewer"
-            btnColor="bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700"
-            hoverBorder="hover:border-slate-400 hover:shadow-slate-200"
-            onClick={() => router.push('/dashfile')}
-          />
+        <section className="mb-20">
+          <div className="mb-5 text-[10px] font-black uppercase tracking-[0.32em] text-slate-400">Workspaces</div>
 
-          <ActionCard
-            title="Smodel"
-            highlight="Inspector"
-            highlightColor="text-cyan-600"
-            desc="Open the Sisense model comparison workspace directly and inspect model differences without leaving the landing page flow."
-            btnText="Open Inspector"
-            btnColor="bg-cyan-600 shadow-cyan-200 hover:bg-cyan-700"
-            hoverBorder="hover:border-cyan-500 hover:shadow-cyan-100"
-            onClick={() => router.push('/smodel-inspector')}
-          />
-
-          <ActionCard
-            title="Dashboard"
-            highlight="Inspector"
-            highlightColor="text-indigo-600"
-            desc="Set dashboard-level credentials and bootstrap the cross-environment comparison run."
-            btnText="Start Setup"
-            btnColor="bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700"
-            hoverBorder="hover:border-indigo-500 hover:shadow-indigo-100"
-            onClick={() => router.push('/dashboard')}
-          />
-
-          <ActionCard
-            title="Widget"
-            highlight="Inspector"
-            highlightColor="text-blue-600"
-            desc="Run widget-level structural compare and continue to data audit output checks."
-            btnText="Check Widget"
-            btnColor="bg-blue-600 shadow-blue-200 hover:bg-blue-700"
-            hoverBorder="hover:border-blue-500 hover:shadow-blue-100"
-            onClick={() => router.push('/widget')}
-          />
-
-          <ActionCard
-            title="Dev"
-            highlight="Workspace"
-            highlightColor="text-sky-600"
-            desc="Open the audit workspace for Report Compare with SAPBI, widget inventory, function lookup, and table transfer."
-            btnText="Open Workspace"
-            btnColor="bg-sky-600 shadow-sky-200 hover:bg-sky-700"
-            hoverBorder="hover:border-sky-500 hover:shadow-sky-100"
-            onClick={() => router.push('/audit')}
-          />
-        </div>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {actionCards.map((card) => (
+              <ActionCard key={`${card.title}-${card.highlight ?? ''}`} {...card} />
+            ))}
+          </div>
+        </section>
 
         <section className="relative">
           <div className="relative flex justify-center mb-12">

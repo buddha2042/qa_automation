@@ -12,6 +12,7 @@ import sys
 import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -75,6 +76,37 @@ def is_excel_serial_day_match(left_value: str, right_value: str) -> bool:
     return left_decimal != left_decimal.to_integral() or right_decimal != right_decimal.to_integral()
 
 
+def excel_serial_to_iso_date(value: Decimal) -> str | None:
+    if value != value.to_integral():
+        return None
+    serial_day = int(value)
+    if serial_day < 20000:
+        return None
+    base_date = datetime(1899, 12, 30)
+    return (base_date + timedelta(days=serial_day)).strftime("%Y-%m-%d")
+
+
+def parse_date_like(text: str) -> str | None:
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    numeric_value = try_parse_decimal(stripped)
+    if numeric_value is not None:
+        excel_date = excel_serial_to_iso_date(numeric_value)
+        if excel_date is not None:
+            return excel_date
+
+    normalized = re.sub(r"\s+", " ", stripped)
+    for fmt in ("%m/%d/%Y", "%m/%d/%y", "%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return datetime.strptime(normalized, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    return None
+
+
 def is_null_like(text: str) -> bool:
     token = text.strip().casefold()
     if token in NULL_TOKENS:
@@ -112,6 +144,11 @@ def are_cells_equivalent(
     trim_whitespace: bool,
     ignore_case: bool,
 ) -> bool:
+    left_date = parse_date_like("" if left_value is None else str(left_value))
+    right_date = parse_date_like("" if right_value is None else str(right_value))
+    if left_date and right_date and left_date == right_date:
+        return True
+
     left_text = normalize_cell(left_value, trim_whitespace, ignore_case)
     right_text = normalize_cell(right_value, trim_whitespace, ignore_case)
     if left_text == right_text:
@@ -451,6 +488,21 @@ def mismatch_similarity_threshold(column_count: int) -> int:
     return max(1, int(math.ceil(column_count * 0.35)))
 
 
+def remove_rows_by_numbers(
+    rows: list[dict[str, Any]],
+    left_row_numbers: set[int],
+    right_row_numbers: set[int],
+) -> list[dict[str, Any]]:
+    return [
+        row
+        for row in rows
+        if not (
+            (row.get("status") == "ONLY_IN_LEFT" and row.get("leftRowNumber") in left_row_numbers)
+            or (row.get("status") == "ONLY_IN_RIGHT" and row.get("rightRowNumber") in right_row_numbers)
+        )
+    ]
+
+
 def filter_rows(rows: list[dict[str, Any]], mappings: list[dict[str, str]], side: str, ignore_empty_rows: bool) -> list[dict[str, Any]]:
     if not ignore_empty_rows:
         return rows
@@ -479,9 +531,16 @@ def compare_tables(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("No comparable columns found. Add at least one column mapping.")
 
     key_mappings = resolve_mappings(left_table.headers, right_table.headers, payload.get("keyMappings", []))
+    non_key_compare_mappings = [
+        mapping
+        for mapping in compare_mappings
+        if not any(mapping["left"] == key["left"] and mapping["right"] == key["right"] for key in key_mappings)
+    ]
 
     left_rows = filter_rows(left_table.rows, compare_mappings, "left", ignore_empty_rows)
     right_rows = filter_rows(right_table.rows, compare_mappings, "right", ignore_empty_rows)
+    left_row_by_number = {row["_rowNumber"]: row for row in left_rows}
+    right_row_by_number = {row["_rowNumber"]: row for row in right_rows}
 
     left_groups: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
     right_groups: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
@@ -648,36 +707,93 @@ def compare_tables(payload: dict[str, Any]) -> dict[str, Any]:
                     )
 
             if repaired_left_indexes:
-                mismatch_rows[:] = [
-                    row
-                    for row in mismatch_rows
-                    if not (
-                        row["status"] == "ONLY_IN_LEFT" and any(row["leftRowNumber"] == remaining_left[i]["_rowNumber"] for i in repaired_left_indexes)
-                    )
-                ]
-                mismatch_rows[:] = [
-                    row
-                    for row in mismatch_rows
-                    if not (
-                        row["status"] == "ONLY_IN_RIGHT" and any(row["rightRowNumber"] == remaining_right[i]["_rowNumber"] for i in used_right_indexes)
-                    )
-                ]
-                comparison_rows[:] = [
-                    row
-                    for row in comparison_rows
-                    if not (
-                        row["status"] == "ONLY_IN_LEFT" and any(row["leftRowNumber"] == remaining_left[i]["_rowNumber"] for i in repaired_left_indexes)
-                    )
-                ]
-                comparison_rows[:] = [
-                    row
-                    for row in comparison_rows
-                    if not (
-                        row["status"] == "ONLY_IN_RIGHT" and any(row["rightRowNumber"] == remaining_right[i]["_rowNumber"] for i in used_right_indexes)
-                    )
-                ]
+                repaired_left_numbers = {remaining_left[i]["_rowNumber"] for i in repaired_left_indexes}
+                repaired_right_numbers = {remaining_right[i]["_rowNumber"] for i in used_right_indexes}
+                mismatch_rows[:] = remove_rows_by_numbers(mismatch_rows, repaired_left_numbers, repaired_right_numbers)
+                comparison_rows[:] = remove_rows_by_numbers(comparison_rows, repaired_left_numbers, repaired_right_numbers)
                 left_only = sum(1 for row in comparison_rows if row["status"] == "ONLY_IN_LEFT")
                 right_only = sum(1 for row in comparison_rows if row["status"] == "ONLY_IN_RIGHT")
+
+    if key_mappings and non_key_compare_mappings:
+        pending_left_only = [
+            row for row in comparison_rows
+            if row["status"] == "ONLY_IN_LEFT" and row.get("leftRowNumber") is not None
+        ]
+        pending_right_only = [
+            row for row in comparison_rows
+            if row["status"] == "ONLY_IN_RIGHT" and row.get("rightRowNumber") is not None
+        ]
+
+        used_right_only_indexes: set[int] = set()
+        merged_left_numbers: set[int] = set()
+        merged_right_numbers: set[int] = set()
+
+        minimum_global_similarity = mismatch_similarity_threshold(len(non_key_compare_mappings))
+
+        for left_only_row in pending_left_only:
+            left_row_number = left_only_row["leftRowNumber"]
+            left_source_row = left_row_by_number.get(left_row_number)
+            if not left_source_row:
+                continue
+
+            best_index = -1
+            best_score = -1
+
+            for right_index, right_only_row in enumerate(pending_right_only):
+                if right_index in used_right_only_indexes:
+                    continue
+                right_row_number = right_only_row["rightRowNumber"]
+                right_source_row = right_row_by_number.get(right_row_number)
+                if not right_source_row:
+                    continue
+
+                score = row_match_score(
+                    left_source_row,
+                    right_source_row,
+                    non_key_compare_mappings,
+                    trim_whitespace,
+                    ignore_case,
+                )
+                if score > best_score:
+                    best_score = score
+                    best_index = right_index
+
+            if best_index < 0 or best_score < minimum_global_similarity:
+                continue
+
+            right_only_row = pending_right_only[best_index]
+            right_source_row = right_row_by_number.get(right_only_row["rightRowNumber"])
+            if not right_source_row:
+                continue
+
+            used_right_only_indexes.add(best_index)
+            merged_left_numbers.add(left_row_number)
+            merged_right_numbers.add(right_only_row["rightRowNumber"])
+            mismatched += 1
+            status = "MISMATCH"
+
+            mismatch_row = {
+                "status": status,
+                "groupKey": left_only_row.get("groupKey", []),
+                "leftRowNumber": left_row_number,
+                "rightRowNumber": right_only_row["rightRowNumber"],
+                "leftValues": {
+                    mapping["left"]: left_source_row["values"].get(mapping["left"], "")
+                    for mapping in compare_mappings
+                },
+                "rightValues": {
+                    mapping["right"]: right_source_row["values"].get(mapping["right"], "")
+                    for mapping in compare_mappings
+                },
+            }
+            comparison_rows.append(mismatch_row)
+            mismatch_rows.append(mismatch_row)
+
+        if merged_left_numbers or merged_right_numbers:
+            comparison_rows[:] = remove_rows_by_numbers(comparison_rows, merged_left_numbers, merged_right_numbers)
+            mismatch_rows[:] = remove_rows_by_numbers(mismatch_rows, merged_left_numbers, merged_right_numbers)
+            left_only = sum(1 for row in comparison_rows if row["status"] == "ONLY_IN_LEFT")
+            right_only = sum(1 for row in comparison_rows if row["status"] == "ONLY_IN_RIGHT")
 
     return {
         "left": {
