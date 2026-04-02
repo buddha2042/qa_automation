@@ -22,7 +22,15 @@ interface SmodelSchema {
 interface SmodelDataset {
   oid?: string;
   name?: string;
+  fullname?: string;
+  database?: string;
   schemaName?: string;
+  connection?: {
+    name?: string | null;
+    provider?: string | null;
+    schema?: string | null;
+    [key: string]: unknown;
+  };
   schema?: SmodelSchema;
   [key: string]: unknown;
 }
@@ -63,6 +71,8 @@ export interface SmodelDocument {
 
 export interface SmodelTransferPreview {
   tableName: string;
+  sourceModelTitle: string;
+  targetModelTitle: string;
   sourceDatasetName: string;
   targetDatasetName: string;
   targetTableFound: boolean;
@@ -98,9 +108,17 @@ export interface SmodelTableCandidate {
   tableType: string;
 }
 
+export interface SmodelDatasetCandidate {
+  datasetIndex: number;
+  datasetName: string;
+  schemaName: string;
+  tableCount: number;
+}
+
 export interface SmodelTransferCandidatesResult {
   sourceMatches: SmodelTableCandidate[];
   targetMatches: SmodelTableCandidate[];
+  targetDatasets: SmodelDatasetCandidate[];
 }
 
 export interface SmodelTransferSelection {
@@ -110,6 +128,17 @@ export interface SmodelTransferSelection {
   targetTableIndex?: number;
   excludedAddedColumnNames?: string[];
 }
+
+const createTargetDatasetForNewTable = (sourceDataset: SmodelDataset): SmodelDataset => {
+  const clonedDataset = cloneJson(sourceDataset);
+  return {
+    ...clonedDataset,
+    schema: {
+      ...(clonedDataset.schema ?? {}),
+      tables: [],
+    },
+  };
+};
 
 interface ResolvedTableLocation {
   dataset: SmodelDataset;
@@ -132,6 +161,29 @@ const getTableName = (table: SmodelTable) => String(table.name ?? table.id ?? ''
 
 const getColumnName = (column: SmodelColumn) => String(column.name ?? column.id ?? '').trim();
 
+const isUuidLike = (value: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
+
+const getDatasetDisplayName = (dataset: SmodelDataset) => {
+  const rawName = String(dataset.name ?? '').trim();
+  if (rawName && !isUuidLike(rawName)) return rawName;
+
+  const connectionName = String(dataset.connection?.name ?? '').trim();
+  if (connectionName) return connectionName;
+
+  const database = String(dataset.database ?? '').trim();
+  const schemaName = String(dataset.schemaName ?? '').trim();
+  if (database && schemaName) return `${database}.${schemaName}`;
+  if (database) return database;
+  if (schemaName) return schemaName;
+
+  const fullname = String(dataset.fullname ?? '').trim().replace(/^[a-z]+:/i, '');
+  if (fullname && !isUuidLike(fullname)) return fullname;
+
+  if (rawName) return rawName;
+  return String(dataset.oid ?? '').trim();
+};
+
 const toTableCandidate = (
   dataset: SmodelDataset,
   datasetIndex: number,
@@ -140,12 +192,22 @@ const toTableCandidate = (
 ): SmodelTableCandidate => ({
   datasetIndex,
   tableIndex,
-  datasetName: String(dataset.name ?? dataset.oid ?? ''),
+  datasetName: getDatasetDisplayName(dataset),
   schemaName: String(table.schemaName ?? dataset.schemaName ?? ''),
   tableName: getTableName(table),
   tableId: String(table.id ?? ''),
   tableOid: String(table.oid ?? ''),
   tableType: String(table.type ?? ''),
+});
+
+const toDatasetCandidate = (
+  dataset: SmodelDataset,
+  datasetIndex: number
+): SmodelDatasetCandidate => ({
+  datasetIndex,
+  datasetName: getDatasetDisplayName(dataset),
+  schemaName: String(dataset.schemaName ?? ''),
+  tableCount: Array.isArray(dataset.schema?.tables) ? dataset.schema.tables.length : 0,
 });
 
 const findTableByIndexes = (
@@ -182,18 +244,27 @@ export function listSmodelTransferCandidates(
   targetModel: SmodelDocument,
   requestedTableName: string
 ): SmodelTransferCandidatesResult {
+  const targetDatasets = Array.isArray(targetModel.datasets)
+    ? targetModel.datasets.map((dataset, datasetIndex) => toDatasetCandidate(dataset, datasetIndex))
+    : [];
+
   return {
     sourceMatches: findTablesByExactName(sourceModel, requestedTableName),
     targetMatches: findTablesByExactName(targetModel, requestedTableName),
+    targetDatasets,
   };
 }
 
 const resolveTargetDatasetIndex = (
   model: SmodelDocument,
   sourceTableLocation: ResolvedTableLocation,
-  targetTableLocation: ResolvedTableLocation | null
+  targetTableLocation: ResolvedTableLocation | null,
+  selectedTargetDatasetIndex?: number
 ) => {
   if (targetTableLocation) return targetTableLocation.datasetIndex;
+  if (Number.isInteger(selectedTargetDatasetIndex) && model.datasets?.[selectedTargetDatasetIndex as number]) {
+    return selectedTargetDatasetIndex as number;
+  }
 
   const sourceSchemaName = normalizeName(sourceTableLocation.table.schemaName ?? sourceTableLocation.dataset.schemaName);
   const datasets = Array.isArray(model.datasets) ? model.datasets : [];
@@ -379,6 +450,19 @@ const getEffectiveTableColumnNames = (table: SmodelTable) => {
       continue;
     }
 
+    if (transformType === 'dont-import') {
+      const columnOid = String(args.column ?? '').trim();
+      if (!columnOid) continue;
+
+      const previousName = currentNamesByColumnOid.get(columnOid);
+      if (!previousName) continue;
+
+      const previousIndex = names.indexOf(previousName);
+      if (previousIndex >= 0) names.splice(previousIndex, 1);
+      currentNamesByColumnOid.delete(columnOid);
+      continue;
+    }
+
     if (transformType === 'add-column') {
       const requestedName = String(args.name ?? args.columnName ?? '').trim();
       if (requestedName) names.push(requestedName);
@@ -389,11 +473,11 @@ const getEffectiveTableColumnNames = (table: SmodelTable) => {
 };
 
 const getColumnIdentityKey = (column: SmodelColumn) => {
-  const normalizedId = normalizeName(column.id);
-  if (normalizedId) return `id:${normalizedId}`;
-
   const normalizedOid = normalizeName(column.oid);
   if (normalizedOid) return `oid:${normalizedOid}`;
+
+  const normalizedId = normalizeName(column.id);
+  if (normalizedId) return `id:${normalizedId}`;
 
   const normalizedName = normalizeName(getColumnName(column));
   if (normalizedName) return `name:${normalizedName}`;
@@ -401,9 +485,48 @@ const getColumnIdentityKey = (column: SmodelColumn) => {
   return '';
 };
 
+const getColumnLookupKeys = (column: SmodelColumn) => {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const pushKey = (prefix: string, value: unknown) => {
+    const normalizedValue = normalizeName(value);
+    if (!normalizedValue) return;
+    const key = `${prefix}:${normalizedValue}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    keys.push(key);
+  };
+
+  pushKey('oid', column.oid);
+  pushKey('id', column.id);
+  pushKey('name', getColumnName(column));
+  return keys;
+};
+
+const buildColumnLookup = (columns: SmodelColumn[]) => {
+  const lookup = new Map<string, SmodelColumn>();
+  for (const column of columns) {
+    for (const key of getColumnLookupKeys(column)) {
+      if (!lookup.has(key)) lookup.set(key, column);
+    }
+  }
+  return lookup;
+};
+
 const getEffectiveColumnEntries = (table: SmodelTable) => {
   const entries: Array<{ key: string; name: string }> = [];
   const indexByKey = new Map<string, number>();
+
+  const removeEntryByKey = (key: string) => {
+    const index = indexByKey.get(key);
+    if (index === undefined || index < 0) return;
+
+    entries.splice(index, 1);
+    indexByKey.delete(key);
+    for (let currentIndex = index; currentIndex < entries.length; currentIndex += 1) {
+      indexByKey.set(entries[currentIndex].key, currentIndex);
+    }
+  };
 
   for (const column of table.columns ?? []) {
     const key = getColumnIdentityKey(column);
@@ -423,6 +546,14 @@ const getEffectiveColumnEntries = (table: SmodelTable) => {
       const index = columnKey ? indexByKey.get(columnKey) : undefined;
       if (index !== undefined && index >= 0 && requestedName) {
         entries[index] = { ...entries[index], name: requestedName };
+      }
+      continue;
+    }
+
+    if (transformType === 'dont-import') {
+      const columnKey = normalizeName(args.column) ? `oid:${normalizeName(args.column)}` : '';
+      if (columnKey) {
+        removeEntryByKey(columnKey);
       }
       continue;
     }
@@ -546,15 +677,13 @@ const retargetTransferredTable = (
   previousTargetTable: SmodelTable | null
 ): { table: SmodelTable; warnings: string[] } => {
   const retargetedTable = cloneJson(sourceTable);
-  const sourceColumnsByName = new Map(
-    (sourceTable.columns ?? []).map((column) => [normalizeName(getColumnName(column)), column] as const)
-  );
-  const previousColumnsByName = new Map(
-    (previousTargetTable?.columns ?? []).map((column) => [normalizeName(getColumnName(column)), column] as const)
-  );
+  const sourceColumns = sourceTable.columns ?? [];
+  const previousColumns = previousTargetTable?.columns ?? [];
+  const sourceColumnsByLookup = buildColumnLookup(sourceColumns);
+  const previousColumnsByLookup = buildColumnLookup(previousColumns);
   const remappedColumnOids = new Map<string, string>();
   const preservedTargetOnlyColumnOids = new Set<string>();
-  const sourceColumnNames = new Set((sourceTable.columns ?? []).map((column) => normalizeName(getColumnName(column))));
+  const sourceColumnKeys = new Set(sourceColumns.flatMap((column) => getColumnLookupKeys(column)));
 
   retargetedTable.schemaName = String(previousTargetTable?.schemaName ?? targetDataset.schemaName ?? retargetedTable.schemaName ?? '');
   if (previousTargetTable?.oid) retargetedTable.oid = previousTargetTable.oid;
@@ -564,9 +693,9 @@ const retargetTransferredTable = (
   if (previousTargetTable && 'isRoleBySystem' in previousTargetTable) retargetedTable.isRoleBySystem = previousTargetTable.isRoleBySystem;
 
   retargetedTable.columns = (retargetedTable.columns ?? []).map((column) => {
-    const columnName = normalizeName(getColumnName(column));
-    const sourceColumn = sourceColumnsByName.get(columnName);
-    const previousColumn = previousColumnsByName.get(columnName);
+    const lookupKeys = getColumnLookupKeys(column);
+    const sourceColumn = lookupKeys.map((key) => sourceColumnsByLookup.get(key)).find(Boolean);
+    const previousColumn = lookupKeys.map((key) => previousColumnsByLookup.get(key)).find(Boolean);
     const nextColumn = cloneJson(column);
 
     if (sourceColumn?.oid && previousColumn?.oid) {
@@ -579,9 +708,9 @@ const retargetTransferredTable = (
     return nextColumn;
   });
 
-  for (const previousColumn of previousTargetTable?.columns ?? []) {
-    const previousColumnName = normalizeName(getColumnName(previousColumn));
-    if (!previousColumnName || sourceColumnNames.has(previousColumnName)) continue;
+  for (const previousColumn of previousColumns) {
+    const hasSourceEquivalent = getColumnLookupKeys(previousColumn).some((key) => sourceColumnKeys.has(key));
+    if (hasSourceEquivalent) continue;
 
     if (previousColumn.oid) preservedTargetOnlyColumnOids.add(previousColumn.oid);
     retargetedTable.columns.push(cloneJson(previousColumn));
@@ -634,11 +763,67 @@ const retargetTransferredTable = (
   };
 };
 
-const getTableEffectiveColumns = (table: SmodelTable) => {
+const addNormalizedIfPresent = (set: Set<string>, value: unknown) => {
+  const normalized = normalizeName(value);
+  if (normalized) set.add(normalized);
+};
+
+const collectColumnReferenceNames = (
+  columnLike: { name?: unknown; id?: unknown; displayName?: unknown }
+) => {
   const names = new Set<string>();
-  for (const name of getEffectiveTableColumnNames(table)) {
-    names.add(normalizeName(name));
+  addNormalizedIfPresent(names, columnLike.name);
+  addNormalizedIfPresent(names, columnLike.id);
+  addNormalizedIfPresent(names, columnLike.displayName);
+  return names;
+};
+
+const getTableReferenceColumns = (table: SmodelTable) => {
+  const names = new Set<string>();
+  const currentNamesByColumnOid = new Map<string, Set<string>>();
+
+  for (const column of table.columns ?? []) {
+    const aliases = collectColumnReferenceNames(column);
+    for (const alias of aliases) names.add(alias);
+
+    const columnOid = String(column.oid ?? '').trim();
+    if (columnOid && aliases.size) {
+      currentNamesByColumnOid.set(columnOid, new Set(aliases));
+    }
   }
+
+  for (const transform of table.tupleTransformations ?? []) {
+    const transformType = String(transform?.type ?? '').trim();
+    const args = (transform?.arguments ?? {}) as Record<string, unknown>;
+
+    if (transformType === 'add-column') {
+      for (const alias of collectColumnReferenceNames({
+        name: args.name,
+        id: args.id,
+        displayName: args.displayName,
+      })) {
+        names.add(alias);
+      }
+      continue;
+    }
+
+    if (transformType === 'rename-column') {
+      const columnOid = String(args.column ?? '').trim();
+      const existingAliases = columnOid ? currentNamesByColumnOid.get(columnOid) : null;
+      if (existingAliases) {
+        for (const alias of existingAliases) names.add(alias);
+      }
+      for (const alias of collectColumnReferenceNames({
+        name: args.name,
+        id: args.id,
+        displayName: args.displayName,
+      })) {
+        names.add(alias);
+        if (existingAliases) existingAliases.add(alias);
+      }
+    }
+  }
+
   return names;
 };
 
@@ -728,47 +913,24 @@ const pruneUnresolvedDerivedExpressions = (
   model: SmodelDocument
 ): { table: SmodelTable; warnings: string[] } => {
   const tableByName = new Map<string, SmodelTable>();
+  const referenceColumnsByTableName = new Map<string, Set<string>>();
   for (const dataset of model.datasets ?? []) {
     for (const candidateTable of dataset.schema?.tables ?? []) {
-      tableByName.set(normalizeName(getTableName(candidateTable)), candidateTable);
+      const normalizedTableName = normalizeName(getTableName(candidateTable));
+      tableByName.set(normalizedTableName, candidateTable);
+      referenceColumnsByTableName.set(normalizedTableName, getTableReferenceColumns(candidateTable));
     }
   }
 
-  tableByName.set(normalizeName(getTableName(table)), table);
-  const localColumns = new Set<string>();
-  const currentNamesByColumnOid = new Map<string, string>();
-  for (const column of table.columns ?? []) {
-    const columnName = String(getColumnName(column) ?? '').trim();
-    const normalizedColumnName = normalizeName(columnName);
-    const columnOid = String(column.oid ?? '').trim();
-    if (normalizedColumnName) localColumns.add(normalizedColumnName);
-    if (columnOid && normalizedColumnName) currentNamesByColumnOid.set(columnOid, normalizedColumnName);
-  }
+  const normalizedLocalTableName = normalizeName(getTableName(table));
+  tableByName.set(normalizedLocalTableName, table);
+  const localReferenceColumns = getTableReferenceColumns(table);
+  referenceColumnsByTableName.set(normalizedLocalTableName, localReferenceColumns);
   const warnings: string[] = [];
   const keptTransforms: unknown[] = [];
 
   for (const transform of table.tupleTransformations ?? []) {
-    const transformType = String((transform as { type?: unknown } | null)?.type ?? '').trim();
     const args = ((transform as { arguments?: unknown } | null)?.arguments ?? {}) as Record<string, unknown>;
-
-    if (transformType === 'dont-import') {
-      const columnOid = String(args.column ?? '').trim();
-      const currentName = columnOid ? currentNamesByColumnOid.get(columnOid) : '';
-      if (currentName) localColumns.delete(currentName);
-      keptTransforms.push(transform);
-      continue;
-    }
-
-    if (transformType === 'rename-column') {
-      const columnOid = String(args.column ?? '').trim();
-      const requestedName = normalizeName(args.name);
-      const currentName = columnOid ? currentNamesByColumnOid.get(columnOid) : '';
-      if (currentName) localColumns.delete(currentName);
-      if (columnOid && requestedName) currentNamesByColumnOid.set(columnOid, requestedName);
-      if (requestedName) localColumns.add(requestedName);
-      keptTransforms.push(transform);
-      continue;
-    }
 
     const formula = getTransformExpressionFormula(transform);
     if (!formula) {
@@ -789,7 +951,7 @@ const pruneUnresolvedDerivedExpressions = (
     for (const lookup of lookupReferences) {
       const normalizedLookupTableName = normalizeName(lookup.lookupTableName);
       const lookupTable = tableByName.get(normalizedLookupTableName);
-      const lookupColumns = lookupTable ? getTableEffectiveColumns(lookupTable) : new Set<string>();
+      const lookupColumns = referenceColumnsByTableName.get(normalizedLookupTableName) ?? new Set<string>();
 
       if (!lookupTable) {
         addMissingReference(`lookup table "${lookup.lookupTableName}" is missing`);
@@ -806,9 +968,9 @@ const pruneUnresolvedDerivedExpressions = (
       const localReferenceColumnName = normalizeName(lookup.localReference.columnName);
       if (localReferenceTableName) {
         const referencedTable = tableByName.get(localReferenceTableName);
-        const referencedColumns = referencedTable ? getTableEffectiveColumns(referencedTable) : new Set<string>();
-        const exists = localReferenceTableName === normalizeName(getTableName(table))
-          ? localColumns.has(localReferenceColumnName)
+        const referencedColumns = referenceColumnsByTableName.get(localReferenceTableName) ?? new Set<string>();
+        const exists = localReferenceTableName === normalizedLocalTableName
+          ? localReferenceColumns.has(localReferenceColumnName)
           : referencedColumns.has(localReferenceColumnName);
         if (!exists) {
           addMissingReference(
@@ -817,7 +979,7 @@ const pruneUnresolvedDerivedExpressions = (
               : `referenced table "${lookup.localReference.tableName}" is missing`
           );
         }
-      } else if (!localColumns.has(localReferenceColumnName)) {
+      } else if (!localReferenceColumns.has(localReferenceColumnName)) {
         addMissingReference(`local column "${getTableName(table)}.${lookup.localReference.columnName}" is missing`);
       }
     }
@@ -828,10 +990,10 @@ const pruneUnresolvedDerivedExpressions = (
 
       if (normalizedTableName) {
         const referencedTable = tableByName.get(normalizedTableName);
-        const referencedColumns = referencedTable ? getTableEffectiveColumns(referencedTable) : new Set<string>();
-        const tableMatchesLocal = normalizedTableName === normalizeName(getTableName(table));
+        const referencedColumns = referenceColumnsByTableName.get(normalizedTableName) ?? new Set<string>();
+        const tableMatchesLocal = normalizedTableName === normalizedLocalTableName;
         const exists = tableMatchesLocal
-          ? localColumns.has(normalizedColumnName)
+          ? localReferenceColumns.has(normalizedColumnName)
           : referencedColumns.has(normalizedColumnName);
         if (exists) continue;
 
@@ -842,7 +1004,7 @@ const pruneUnresolvedDerivedExpressions = (
         continue;
       }
 
-      if (!localColumns.has(normalizedColumnName)) {
+      if (!localReferenceColumns.has(normalizedColumnName)) {
         const warning = `local column "${getTableName(table)}.${reference.columnName}" is missing`;
         addMissingReference(warning);
       }
@@ -856,10 +1018,6 @@ const pruneUnresolvedDerivedExpressions = (
       continue;
     }
 
-    if (transformType === 'add-column') {
-      const outputName = normalizeName(args.name ?? args.columnName);
-      if (outputName) localColumns.add(outputName);
-    }
     keptTransforms.push(transform);
   }
 
@@ -935,6 +1093,12 @@ const remapExistingTargetRelations = (
   const warnings: string[] = [];
   const previousColumnsByOid = new Map<string, SmodelColumn>();
   const insertedColumnsByName = new Map<string, SmodelColumn>();
+  const droppedColumnOids = new Set(
+    (insertedTargetTable.tupleTransformations ?? [])
+      .filter((transform) => String(transform?.type ?? '').trim() === 'dont-import')
+      .map((transform) => String(((transform?.arguments ?? {}) as Record<string, unknown>).column ?? '').trim())
+      .filter(Boolean)
+  );
 
   for (const column of previousTargetTable.columns ?? []) {
     if (column.oid) previousColumnsByOid.set(column.oid, column);
@@ -964,6 +1128,7 @@ const remapExistingTargetRelations = (
         dataset: targetDataset.oid ?? column.dataset,
         table: insertedTargetTable.oid ?? column.table,
         column: nextColumn?.oid ?? column.column,
+        isDropped: nextColumn?.oid && !droppedColumnOids.has(nextColumn.oid) ? null : column.isDropped,
       };
     }).filter((column): column is SmodelRelationRef => Boolean(column));
 
@@ -991,6 +1156,7 @@ export function transferSmodelTable(
 
   const sourceModel = cloneJson(sourceModelInput);
   const targetModel = cloneJson(targetModelInput);
+  const setupWarnings: string[] = [];
   if (!Array.isArray(sourceModel.datasets) || !Array.isArray(targetModel.datasets)) {
     throw new Error('Both uploaded files must contain Sisense model datasets.');
   }
@@ -1035,10 +1201,18 @@ export function transferSmodelTable(
       );
     }
   }
-  const targetDatasetIndex = resolveTargetDatasetIndex(targetModel, sourceTableLocation, targetTableLocation);
+  let targetDatasetIndex = resolveTargetDatasetIndex(
+    targetModel,
+    sourceTableLocation,
+    targetTableLocation,
+    selection.targetDatasetIndex
+  );
   if (targetDatasetIndex < 0) {
-    throw new Error(
-      `Could not find a matching target dataset for table "${normalizedTableName}". Add the table to the target model first or align the schema name.`
+    const createdTargetDataset = createTargetDatasetForNewTable(sourceTableLocation.dataset);
+    targetModel.datasets.push(createdTargetDataset);
+    targetDatasetIndex = targetModel.datasets.length - 1;
+    setupWarnings.push(
+      `No matching target table or dataset was found for "${normalizedTableName}". A new dataset block was created in the target cube to hold the transferred table.`
     );
   }
 
@@ -1050,6 +1224,9 @@ export function transferSmodelTable(
   }
 
   const previousTargetTable = targetTableLocation ? cloneJson(targetTableLocation.table) : null;
+  const previousTargetRelations = (targetModel.relations ?? []).filter((relation) =>
+    (relation.columns ?? []).some((column) => column.table === previousTargetTable?.oid)
+  );
   const preparedTable = prepareTransferredTable(
     cloneJson(sourceTableLocation.table),
     normalizedTableName
@@ -1085,16 +1262,12 @@ export function transferSmodelTable(
 
   validateTableSchema(finalizedTargetTable);
 
-  const previousTargetRelations = (targetModel.relations ?? []).filter((relation) =>
-    (relation.columns ?? []).some((column) => column.table === previousTargetTable?.oid)
-  );
-
   const sourceTableOid = sourceTableLocation.table.oid ?? '';
   const relatedSourceRelations = (sourceModel.relations ?? []).filter((relation) =>
     (relation.columns ?? []).some((column) => column.table === sourceTableOid)
   );
 
-  const warnings: string[] = [...preparedTable.warnings, ...retargetedTable.warnings, ...prunedExcludedColumns.warnings, ...prunedLookupTransforms.warnings];
+  const warnings: string[] = [...setupWarnings, ...preparedTable.warnings, ...retargetedTable.warnings, ...prunedExcludedColumns.warnings, ...prunedLookupTransforms.warnings];
   const sourceBinaryRelationCount = relatedSourceRelations.filter(isBinaryRelation).length;
   const sourceNonBinaryRelationCount = relatedSourceRelations.length - sourceBinaryRelationCount;
   if (relatedSourceRelations.length) {
@@ -1145,6 +1318,8 @@ export function transferSmodelTable(
     transformedModel: targetModel,
     preview: {
       tableName: getTableName(sourceTableLocation.table) || normalizedTableName,
+      sourceModelTitle: String(sourceModel.title ?? ''),
+      targetModelTitle: String(targetModelInput.title ?? ''),
       sourceDatasetName: String(sourceTableLocation.dataset.name ?? sourceTableLocation.dataset.oid ?? ''),
       targetDatasetName: String(targetDataset.name ?? targetDataset.oid ?? ''),
       targetTableFound: Boolean(targetTableLocation),

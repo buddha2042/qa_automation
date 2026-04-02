@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, Database, Upload } from 'lucide-react';
+import { AlertTriangle, Database, Download, Upload } from 'lucide-react';
 
 interface SmodelTransferPreview {
   tableName: string;
+  sourceModelTitle: string;
+  targetModelTitle: string;
   sourceDatasetName: string;
   targetDatasetName: string;
   targetTableFound: boolean;
@@ -23,17 +25,7 @@ interface SmodelTransferPreview {
   previousTargetRelationCount: number;
   updatedTargetRelationCount: number;
   copiedRelationCount: number;
-  sourceRelations: SmodelTransferRelationPreview[];
-  previousTargetRelations: SmodelTransferRelationPreview[];
-  copiedRelations: SmodelTransferRelationPreview[];
   warnings: string[];
-}
-
-interface SmodelTransferRelationPreview {
-  relationOid: string;
-  relationType: string;
-  summary: string;
-  json: string;
 }
 
 interface SmodelTableCandidate {
@@ -47,8 +39,9 @@ interface SmodelTableCandidate {
   tableType: string;
 }
 
-const formatTransferWarning = (warning: string) => warning.trim().replace(/\s+/g, ' ');
+type LoadingState = '' | 'inspect' | 'preview' | 'apply';
 
+const formatTransferWarning = (warning: string) => warning.trim().replace(/\s+/g, ' ');
 const summarizeTransferWarnings = (warnings: string[]) => {
   const notes: string[] = [];
   const seen = new Set<string>();
@@ -59,6 +52,8 @@ const summarizeTransferWarnings = (warnings: string[]) => {
       warning.startsWith('Skipped dont-import transformation for a removed column')
       || warning.startsWith('Skipped change-data-type transformation for a removed column')
       || warning.startsWith('Skipped rename-column transformation')
+      || warning.startsWith('Source joins were reviewed but not copied.')
+      || (warning.startsWith('Detected ') && warning.includes('malformed source relation'))
     ) {
       continue;
     }
@@ -69,14 +64,6 @@ const summarizeTransferWarnings = (warnings: string[]) => {
           .replace(/^Skipped derived column /, '')
           .replace(/ while transferring table .*? because /, ' could not be transferred because ')
       );
-      continue;
-    }
-
-    if (warning.startsWith('Source joins were reviewed but not copied.')) {
-      continue;
-    }
-
-    if (warning.startsWith('Detected ') && warning.includes('malformed source relation')) {
       continue;
     }
 
@@ -104,7 +91,7 @@ export default function SmodelTableTransferWorkspace({
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [targetFile, setTargetFile] = useState<File | null>(null);
   const [tableName, setTableName] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loadingState, setLoadingState] = useState<LoadingState>('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [preview, setPreview] = useState<SmodelTransferPreview | null>(null);
@@ -112,16 +99,20 @@ export default function SmodelTableTransferWorkspace({
   const [targetMatches, setTargetMatches] = useState<SmodelTableCandidate[]>([]);
   const [selectedSourceKey, setSelectedSourceKey] = useState('');
   const [selectedTargetKey, setSelectedTargetKey] = useState('');
-  const [pendingModelText, setPendingModelText] = useState('');
   const [selectedAddedColumns, setSelectedAddedColumns] = useState<string[]>([]);
-  const transferNotes = preview ? summarizeTransferWarnings(preview.warnings) : [];
+  const [pendingModelText, setPendingModelText] = useState('');
+  const [workingTargetModelText, setWorkingTargetModelText] = useState('');
+  const [workingTargetFileName, setWorkingTargetFileName] = useState('');
+  const [stagedChangeCount, setStagedChangeCount] = useState(0);
 
-  const canInspect = Boolean(sourceFile && targetFile && tableName.trim());
-  const canRun = Boolean(sourceFile && targetFile && tableName.trim() && selectedSourceKey);
-  const canConfirm = Boolean(preview && pendingModelText);
   const isEmbedded = variant === 'embedded';
+  const transferNotes = preview ? summarizeTransferWarnings(preview.warnings) : [];
+  const canInspect = Boolean(sourceFile && (targetFile || workingTargetModelText) && tableName.trim());
+  const canRun = Boolean(canInspect && selectedSourceKey);
+  const canApplyToWorkingCopy = Boolean(preview && pendingModelText);
+  const canDownload = Boolean(workingTargetModelText || pendingModelText);
 
-  const resetTransferState = () => {
+  const resetReviewState = () => {
     setError('');
     setSuccess('');
     setPreview(null);
@@ -133,6 +124,13 @@ export default function SmodelTableTransferWorkspace({
     setSelectedTargetKey('');
   };
 
+  const resetWorkspaceState = () => {
+    resetReviewState();
+    setWorkingTargetModelText('');
+    setWorkingTargetFileName('');
+    setStagedChangeCount(0);
+  };
+
   const parseSelectionKey = (value: string) => {
     const [datasetIndexRaw, tableIndexRaw] = value.split(':');
     const datasetIndex = Number(datasetIndexRaw);
@@ -141,10 +139,35 @@ export default function SmodelTableTransferWorkspace({
     return { datasetIndex, tableIndex };
   };
 
+  const postFormRequest = async <T,>(formData: FormData): Promise<T> => {
+    const response = await fetch('/api/excel/sisense/smodel-transfer-table', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const json = (await response.json()) as T & { error?: string };
+    if (!response.ok) {
+      throw new Error(json.error || 'Table transfer request failed.');
+    }
+    return json;
+  };
+
+  const buildTargetUpload = () => {
+    if (workingTargetModelText) {
+      return new File(
+        [workingTargetModelText],
+        workingTargetFileName || targetFile?.name || 'working-target.smodel',
+        { type: 'application/json' }
+      );
+    }
+
+    return targetFile;
+  };
+
   const handleInspect = async () => {
     if (!sourceFile || !targetFile || !tableName.trim()) return;
 
-    setLoading(true);
+    setLoadingState('inspect');
     setError('');
     setSuccess('');
     setPreview(null);
@@ -152,25 +175,17 @@ export default function SmodelTableTransferWorkspace({
 
     try {
       const formData = new FormData();
+      const currentTargetUpload = buildTargetUpload();
+      if (!currentTargetUpload) throw new Error('Upload a target cube file before reviewing changes.');
       formData.append('left', sourceFile);
-      formData.append('right', targetFile);
+      formData.append('right', currentTargetUpload);
       formData.append('tableName', tableName.trim());
       formData.append('action', 'inspect');
 
-      const response = await fetch('/api/excel/sisense/smodel-transfer-table', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const json = (await response.json()) as {
-        error?: string;
+      const json = await postFormRequest<{
         sourceMatches?: SmodelTableCandidate[];
         targetMatches?: SmodelTableCandidate[];
-      };
-
-      if (!response.ok) {
-        throw new Error(json.error || 'Failed to inspect the selected table.');
-      }
+      }>(formData);
 
       const nextSourceMatches = json.sourceMatches ?? [];
       const nextTargetMatches = json.targetMatches ?? [];
@@ -190,37 +205,40 @@ export default function SmodelTableTransferWorkspace({
       if (!nextSourceMatches.length) {
         setError(`No exact case-sensitive source table matches were found for "${tableName.trim()}".`);
       } else if (nextSourceMatches.length > 1 || nextTargetMatches.length > 1) {
-        setSuccess('Select the exact source and target table entries before transferring.');
+        setSuccess('Select the exact source and target table entries before reviewing the transfer.');
+      } else if (!nextTargetMatches.length) {
+        setSuccess('No exact target table was found. The review will prepare a new table addition directly in the working target model.');
       } else {
-        setSuccess('Exact table matches loaded. Review the selections and run the transfer.');
+        setSuccess('Exact table matches loaded. Review the selections and prepare the next local change.');
       }
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : 'Failed to inspect the selected table.';
-      setError(message);
+      setError(requestError instanceof Error ? requestError.message : 'Failed to inspect the selected table.');
     } finally {
-      setLoading(false);
+      setLoadingState('');
     }
   };
 
   const handleTransfer = async () => {
-    if (!sourceFile || !targetFile || !tableName.trim() || !selectedSourceKey) return;
+    if (!sourceFile || !tableName.trim() || !selectedSourceKey) return;
 
     const sourceSelection = parseSelectionKey(selectedSourceKey);
     const targetSelection = selectedTargetKey ? parseSelectionKey(selectedTargetKey) : null;
     if (!sourceSelection) {
-      setError('Select an exact source table before transferring.');
+      setError('Select an exact source table before reviewing the transfer.');
       return;
     }
 
-    setLoading(true);
+    setLoadingState('preview');
     setError('');
     setSuccess('');
     setPreview(null);
 
     try {
       const formData = new FormData();
+      const currentTargetUpload = buildTargetUpload();
+      if (!currentTargetUpload) throw new Error('Upload a target cube file before reviewing changes.');
       formData.append('left', sourceFile);
-      formData.append('right', targetFile);
+      formData.append('right', currentTargetUpload);
       formData.append('tableName', tableName.trim());
       formData.append('action', 'transfer');
       formData.append('sourceDatasetIndex', String(sourceSelection.datasetIndex));
@@ -230,32 +248,108 @@ export default function SmodelTableTransferWorkspace({
         formData.append('targetTableIndex', String(targetSelection.tableIndex));
       }
 
-      const response = await fetch('/api/excel/sisense/smodel-transfer-table', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const json = (await response.json()) as {
-        error?: string;
+      const json = await postFormRequest<{
         preview?: SmodelTransferPreview;
         transformedModelText?: string;
-        suggestedFilename?: string;
-      };
+      }>(formData);
 
-      if (!response.ok || !json.preview || !json.transformedModelText) {
-        throw new Error(json.error || 'Failed to transfer the selected table.');
+      if (!json.preview || !json.transformedModelText) {
+        throw new Error('The transfer preview could not be prepared.');
       }
 
       setPreview(json.preview);
       setPendingModelText(json.transformedModelText);
       setSelectedAddedColumns(json.preview.columnDiff.added);
-      setSuccess(`Review the column changes for "${json.preview.tableName}" and confirm before downloading the transformed target model.`);
+      setSuccess(
+        'Review the preview, then apply it to the working target copy. You can keep stacking changes locally before the final download.'
+      );
     } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : 'Failed to transfer the selected table.';
-      setError(message);
+      setError(requestError instanceof Error ? requestError.message : 'Failed to prepare the table transfer.');
     } finally {
-      setLoading(false);
+      setLoadingState('');
     }
+  };
+
+  const handleApplyToWorkingCopy = async () => {
+    if (!sourceFile || !preview || !selectedSourceKey) return;
+
+    const sourceSelection = parseSelectionKey(selectedSourceKey);
+    const targetSelection = selectedTargetKey ? parseSelectionKey(selectedTargetKey) : null;
+    if (!sourceSelection) {
+      setError('Select an exact source table before applying to the working copy.');
+      return;
+    }
+
+    const currentTargetUpload = buildTargetUpload();
+    if (!currentTargetUpload) {
+      setError('Upload a target cube file before applying to the working copy.');
+      return;
+    }
+
+    setLoadingState('apply');
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('left', sourceFile);
+      formData.append('right', currentTargetUpload);
+      formData.append('tableName', tableName.trim());
+      formData.append('action', 'transfer');
+      formData.append('sourceDatasetIndex', String(sourceSelection.datasetIndex));
+      formData.append('sourceTableIndex', String(sourceSelection.tableIndex));
+      if (targetSelection) {
+        formData.append('targetDatasetIndex', String(targetSelection.datasetIndex));
+        formData.append('targetTableIndex', String(targetSelection.tableIndex));
+      }
+      for (const columnName of preview.columnDiff.added) {
+        if (!selectedAddedColumns.includes(columnName)) {
+          formData.append('excludedAddedColumnNames', columnName);
+        }
+      }
+
+      const json = await postFormRequest<{
+        preview?: SmodelTransferPreview;
+        transformedModelText?: string;
+      }>(formData);
+
+      if (!json.preview || !json.transformedModelText) {
+        throw new Error('The working copy could not be updated.');
+      }
+
+      setPreview(json.preview);
+      setPendingModelText(json.transformedModelText);
+      setSelectedAddedColumns(json.preview.columnDiff.added.filter((name) => selectedAddedColumns.includes(name)));
+      setWorkingTargetModelText(json.transformedModelText);
+      setWorkingTargetFileName(
+        targetFile?.name
+          ? targetFile.name.replace(/(\.smodel|\.json)?$/i, '.working.smodel')
+          : 'working-target.smodel'
+      );
+      setStagedChangeCount((current) => current + 1);
+      setSuccess(
+        `Applied "${json.preview.tableName}" to the local working copy. You can keep making more changes before the final download.`
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to update the working copy.');
+    } finally {
+      setLoadingState('');
+    }
+  };
+
+  const handleDownload = () => {
+    const nextModelText = workingTargetModelText || pendingModelText;
+    if (!nextModelText) return;
+
+    const blob = new Blob([nextModelText], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = workingTargetFileName || targetFile?.name?.replace(/(\.smodel|\.json)?$/i, '.updated.smodel') || 'updated-target.smodel';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   const toggleAddedColumn = (columnName: string) => {
@@ -264,74 +358,6 @@ export default function SmodelTableTransferWorkspace({
         ? current.filter((entry) => entry !== columnName)
         : [...current, columnName]
     );
-  };
-
-  const handleConfirmDownload = async () => {
-    if (!sourceFile || !targetFile || !tableName.trim() || !selectedSourceKey || !preview) return;
-
-    const sourceSelection = parseSelectionKey(selectedSourceKey);
-    const targetSelection = selectedTargetKey ? parseSelectionKey(selectedTargetKey) : null;
-    if (!sourceSelection) {
-      setError('Select an exact source table before transferring.');
-      return;
-    }
-
-    const excludedAddedColumns = preview.columnDiff.added.filter((columnName) => !selectedAddedColumns.includes(columnName));
-
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const formData = new FormData();
-      formData.append('left', sourceFile);
-      formData.append('right', targetFile);
-      formData.append('tableName', tableName.trim());
-      formData.append('action', 'transfer');
-      formData.append('sourceDatasetIndex', String(sourceSelection.datasetIndex));
-      formData.append('sourceTableIndex', String(sourceSelection.tableIndex));
-      if (targetSelection) {
-        formData.append('targetDatasetIndex', String(targetSelection.datasetIndex));
-        formData.append('targetTableIndex', String(targetSelection.tableIndex));
-      }
-      for (const columnName of excludedAddedColumns) {
-        formData.append('excludedAddedColumnNames', columnName);
-      }
-
-      const response = await fetch('/api/excel/sisense/smodel-transfer-table', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const json = (await response.json()) as {
-        error?: string;
-        preview?: SmodelTransferPreview;
-        transformedModelText?: string;
-        suggestedFilename?: string;
-      };
-
-      if (!response.ok || !json.preview || !json.transformedModelText) {
-        throw new Error(json.error || 'Failed to transfer the selected table.');
-      }
-
-      setPreview(json.preview);
-      setPendingModelText(json.transformedModelText);
-      setSelectedAddedColumns(json.preview.columnDiff.added);
-
-      const blob = new Blob([json.transformedModelText], { type: 'application/json;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = json.suggestedFilename || `${tableName.trim()}.smodel`;
-      link.click();
-      URL.revokeObjectURL(url);
-      setSuccess(`Transferred table "${json.preview.tableName}" and downloaded the transformed target model.`);
-    } catch (requestError) {
-      const message = requestError instanceof Error ? requestError.message : 'Failed to transfer the selected table.';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
@@ -344,7 +370,7 @@ export default function SmodelTableTransferWorkspace({
             </p>
             <h2 className="mt-2 text-3xl font-black tracking-tight">Table transformation workspace</h2>
             <p className="mt-2 max-w-3xl text-sm text-slate-500">
-              Upload two Sisense `.smodel` files, enter the exact case-sensitive table name, review the matching table blocks, and then copy that exact source table block into the target model.
+              Upload the source and target cube files, keep applying approved changes to a local working copy, and download the final `.smodel` only when you are satisfied with all staged updates.
             </p>
           </div>
           <div className="rounded-2xl bg-sky-50 p-3 text-sky-600">
@@ -354,23 +380,23 @@ export default function SmodelTableTransferWorkspace({
 
         <div className="mt-8 grid gap-5 lg:grid-cols-2">
           <TransferFileCard
-            label="Source Model"
+            label="Source Cube File"
             title="From"
-            helpText="Upload the model that contains the table you want to copy."
+            helpText="Upload the cube file that contains the table you want to copy."
             file={sourceFile}
             onChange={(file) => {
               setSourceFile(file);
-              resetTransferState();
+              resetReviewState();
             }}
           />
           <TransferFileCard
-            label="Target Model"
+            label="Target Cube File"
             title="To"
-            helpText="Upload the model that should receive the transferred table."
+            helpText="Upload the cube file that should receive the transferred table for preview and validation."
             file={targetFile}
             onChange={(file) => {
               setTargetFile(file);
-              resetTransferState();
+              resetWorkspaceState();
             }}
           />
         </div>
@@ -382,40 +408,40 @@ export default function SmodelTableTransferWorkspace({
               value={tableName}
               onChange={(event) => {
                 setTableName(event.target.value);
-                setError('');
-                setSuccess('');
-                setPreview(null);
-                setSourceMatches([]);
-                setTargetMatches([]);
-                setSelectedSourceKey('');
-                setSelectedTargetKey('');
+                resetReviewState();
               }}
-              placeholder="Example: Claim Supplemental"
+              placeholder="Example: Catastrophe"
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
             />
           </label>
           <button
             type="button"
             onClick={handleInspect}
-            disabled={!canInspect || loading}
+            disabled={!canInspect || loadingState !== ''}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? 'Inspecting...' : 'Find Exact Matches'}
+            {loadingState === 'inspect' ? 'Inspecting...' : 'Find Exact Matches'}
           </button>
           <button
             type="button"
             onClick={handleTransfer}
-            disabled={!canRun || loading}
+            disabled={!canRun || loadingState !== ''}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-sky-200 transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Upload size={16} />
-            {loading ? 'Preparing Transfer...' : 'Review Transfer'}
+            {loadingState === 'preview' ? 'Preparing Review...' : 'Review Transfer'}
           </button>
         </div>
 
         <p className="mt-3 text-xs font-medium text-slate-500">
-          Exact case-sensitive match is used. If more than one table shares the same name, select the exact source and target entry below before transferring.
+          Exact case-sensitive match is used. Hidden columns, dropped columns, and full new-table lift-and-shift are handled inside the local working copy. No live Sisense cube is updated from this screen.
         </p>
+
+        {(workingTargetModelText || stagedChangeCount > 0) ? (
+          <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            Working copy active: {stagedChangeCount} staged change{stagedChangeCount === 1 ? '' : 's'} applied to {preview?.targetModelTitle || targetFile?.name || 'target cube'}.
+          </div>
+        ) : null}
 
         {(sourceMatches.length || targetMatches.length) ? (
           <div className="mt-6 grid gap-4 xl:grid-cols-2">
@@ -430,11 +456,11 @@ export default function SmodelTableTransferWorkspace({
             />
             <TransferCandidateCard
               title="Target Table Matches"
-              description="Choose the exact target table block to overwrite. Leave blank to let the system insert into the resolved target dataset when no exact target match exists."
+              description="Choose an exact target table only if you want to replace that existing table. Leave this blank to keep the review in add-new-table mode."
               candidates={targetMatches}
               selectedKey={selectedTargetKey}
               onChange={setSelectedTargetKey}
-              emptyText="No exact target matches found. Transfer will insert into the resolved target dataset if possible."
+              emptyText="No exact target matches found. The review will prepare a new table addition directly in the working target model."
             />
           </div>
         ) : null}
@@ -454,96 +480,146 @@ export default function SmodelTableTransferWorkspace({
       </section>
 
       {preview ? (
-        <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-700">Confirm Changes</p>
-                <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">Review exactly what will change before download</h3>
-                <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                  This transfer will update only the selected target table block. Review the real column names below, then confirm when you are comfortable proceeding.
-                </p>
+        <>
+          <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="rounded-[24px] border border-sky-200 bg-sky-50 p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.2em] text-sky-700">Confirm Changes</p>
+                  <h3 className="mt-2 text-xl font-black tracking-tight text-slate-900">Review exactly what will change before updating the working copy</h3>
+                  <p className="mt-2 max-w-3xl text-sm text-slate-600">
+                    This preview is built from the uploaded cube files. When you confirm, the transformed target model will replace the current local working copy, and you can continue staging more changes before the final download.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={handleApplyToWorkingCopy}
+                    disabled={!canApplyToWorkingCopy || loadingState !== ''}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loadingState === 'apply' ? 'Applying To Working Copy...' : 'Apply To Working Copy'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    disabled={!canDownload}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Download size={16} />
+                    Download Final Cube
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handleConfirmDownload}
-                disabled={!canConfirm}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Confirm and Download
-              </button>
+
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <TransferStatCard label="Source Columns" value={String(preview.sourceColumnCount)} />
+                <TransferStatCard label="Current Target Columns" value={String(preview.previousTargetColumnCount)} />
+                <TransferStatCard label="New Target Columns" value={String(preview.updatedTargetColumnCount)} />
+              </div>
+
+              <div className="mt-5 grid gap-4 xl:grid-cols-4">
+                <TransferListCard
+                  title="Columns To Add"
+                  items={preview.columnDiff.added}
+                  selectable
+                  selectedItems={selectedAddedColumns}
+                  onToggleItem={toggleAddedColumn}
+                  emptyText="No new columns will be added."
+                />
+                <TransferRenameListCard
+                  title="Renamed During Transfer"
+                  items={preview.columnDiff.renamed}
+                  emptyText="No matching columns were renamed."
+                />
+                <TransferListCard
+                  title="Kept From Target Only"
+                  items={preview.columnDiff.preservedTargetOnly}
+                  emptyText="No target-only columns needed to be preserved."
+                />
+                <TransferListCard
+                  title="Columns Staying"
+                  items={preview.columnDiff.unchanged}
+                  emptyText="No matching column names were carried over."
+                />
+              </div>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              <TransferStatCard label="Source Columns" value={String(preview.sourceColumnCount)} />
-              <TransferStatCard label="Current Target Columns" value={String(preview.previousTargetColumnCount)} />
-              <TransferStatCard label="New Target Columns" value={String(preview.updatedTargetColumnCount)} />
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <TransferStatCard label="Table" value={preview.tableName} />
+              <TransferStatCard label="Source Cube" value={preview.sourceModelTitle || '-'} />
+              <TransferStatCard label="Working Target Cube" value={preview.targetModelTitle || '-'} />
             </div>
 
-            <div className="mt-5 grid gap-4 xl:grid-cols-4">
-              <TransferListCard
-                title="Columns To Add"
-                items={preview.columnDiff.added}
-                selectable
-                selectedItems={selectedAddedColumns}
-                onToggleItem={toggleAddedColumn}
-                emptyText="No new columns will be added."
-              />
-              <TransferRenameListCard
-                title="Columns Renamed"
-                items={preview.columnDiff.renamed}
-                emptyText="No matching columns were renamed."
-              />
-              <TransferListCard
-                title="Target Columns Preserved"
-                items={preview.columnDiff.preservedTargetOnly}
-                emptyText="No target-only columns needed to be preserved."
-              />
-              <TransferListCard
-                title="Columns Staying"
-                items={preview.columnDiff.unchanged}
-                emptyText="No matching column names were carried over."
-              />
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <TransferStatCard label="Source Dataset" value={preview.sourceDatasetName || '-'} />
+              <TransferStatCard label="Target Dataset" value={preview.targetDatasetName || '-'} />
+              <TransferStatCard label="Existing Target Table" value={preview.targetTableFound ? 'Yes' : 'No'} />
             </div>
-          </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <TransferStatCard label="Table" value={preview.tableName} />
-            <TransferStatCard label="Source Dataset" value={preview.sourceDatasetName || '-'} />
-            <TransferStatCard label="Target Dataset" value={preview.targetDatasetName || '-'} />
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <TransferStatCard label="Existing Target Table" value={preview.targetTableFound ? 'Yes' : 'No'} />
-            <TransferStatCard label="Previous Target Joins" value={String(preview.previousTargetRelationCount)} />
-            <TransferStatCard label="Updated Target Joins" value={String(preview.updatedTargetRelationCount)} />
-          </div>
-
-          {transferNotes.length ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              <p className="font-bold text-amber-950">Transfer notes</p>
-              <ul className="mt-2 space-y-2">
-                {transferNotes.map((warning, index) => (
-                  <li key={`${warning}-${index}`} className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" />
-                    <span>{warning}</span>
-                  </li>
-                ))}
-              </ul>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <TransferStatCard label="Previous Target Joins" value={String(preview.previousTargetRelationCount)} />
+              <TransferStatCard label="Updated Target Joins" value={String(preview.updatedTargetRelationCount)} />
+              <TransferStatCard label="Staged Local Changes" value={String(stagedChangeCount)} />
             </div>
-          ) : null}
 
-          <div className="mt-6 grid gap-4 xl:grid-cols-3">
-            <TransferPreviewCard title="Source Table Block" body={preview.sourceTableJson} />
-            <TransferPreviewCard
-              title="Previous Target Table Block"
-              body={preview.previousTargetTableJson || 'Target table did not exist before transfer.'}
-            />
-            <TransferPreviewCard title="Updated Target Table Block" body={preview.updatedTargetTableJson} />
-          </div>
-        </section>
+            {transferNotes.length ? (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p className="font-bold text-amber-950">Transfer notes</p>
+                <ul className="mt-2 space-y-2">
+                  {transferNotes.map((warning, index) => (
+                    <li key={`${warning}-${index}`} className="flex items-start gap-2">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" />
+                      <span>{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="mt-6 grid gap-4 xl:grid-cols-3">
+              <TransferPreviewCard title="Source Table Block" body={preview.sourceTableJson} />
+              <TransferPreviewCard
+                title="Previous Target Table Block"
+                body={preview.previousTargetTableJson || 'Target table did not exist before transfer.'}
+              />
+              <TransferPreviewCard title="Updated Target Table Block" body={preview.updatedTargetTableJson} />
+            </div>
+          </section>
+        </>
       ) : null}
     </div>
+  );
+}
+
+function TransferFileCard({
+  label,
+  title,
+  helpText,
+  file,
+  onChange,
+}: {
+  label: string;
+  title: string;
+  helpText: string;
+  file: File | null;
+  onChange: (file: File | null) => void;
+}) {
+  return (
+    <label className="block rounded-[28px] border border-slate-200 bg-slate-50/70 p-6">
+      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{label}</span>
+      <div className="mt-2 text-xl font-black tracking-tight text-slate-900">{title}</div>
+      <p className="mt-2 text-sm text-slate-500">{helpText}</p>
+      <input
+        type="file"
+        accept=".smodel,.json"
+        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+        className="mt-4 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+      />
+      <div className="mt-3 rounded-xl bg-white px-3 py-2 text-sm text-slate-600">
+        {file ? file.name : 'No file selected'}
+      </div>
+    </label>
   );
 }
 
@@ -579,7 +655,7 @@ function TransferCandidateCard({
                 onChange={() => onChange('')}
                 className="mt-1"
               />
-              <span>Auto-resolve target insertion if no explicit overwrite selection is needed.</span>
+              <span>No overwrite. Keep the preview in add-new-table mode.</span>
             </label>
           ) : null}
           {candidates.map((candidate) => {
@@ -609,37 +685,6 @@ function TransferCandidateCard({
         </div>
       )}
     </div>
-  );
-}
-
-function TransferFileCard({
-  label,
-  title,
-  helpText,
-  file,
-  onChange,
-}: {
-  label: string;
-  title: string;
-  helpText: string;
-  file: File | null;
-  onChange: (file: File | null) => void;
-}) {
-  return (
-    <label className="block rounded-[28px] border border-slate-200 bg-slate-50/70 p-6">
-      <span className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-500">{label}</span>
-      <div className="mt-2 text-xl font-black tracking-tight text-slate-900">{title}</div>
-      <p className="mt-2 text-sm text-slate-500">{helpText}</p>
-      <input
-        type="file"
-        accept=".smodel,.json"
-        onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-        className="mt-4 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-      />
-      <div className="mt-3 rounded-xl bg-white px-3 py-2 text-sm text-slate-600">
-        {file ? file.name : 'No file selected'}
-      </div>
-    </label>
   );
 }
 
