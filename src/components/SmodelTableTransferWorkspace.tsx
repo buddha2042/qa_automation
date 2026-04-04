@@ -165,7 +165,7 @@ export default function SmodelTableTransferWorkspace({
   };
 
   const handleInspect = async () => {
-    if (!sourceFile || !targetFile || !tableName.trim()) return;
+    if (!sourceFile || !buildTargetUpload() || !tableName.trim()) return;
 
     setLoadingState('inspect');
     setError('');
@@ -386,7 +386,7 @@ export default function SmodelTableTransferWorkspace({
             file={sourceFile}
             onChange={(file) => {
               setSourceFile(file);
-              resetReviewState();
+              resetWorkspaceState();
             }}
           />
           <TransferFileCard

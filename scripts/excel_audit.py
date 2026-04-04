@@ -39,6 +39,12 @@ NULL_TOKENS = {
     "\\",
 }
 VOWELS = set("aeiou")
+MIN_EXCEL_SERIAL_DAY = 20000
+MAX_EXCEL_SERIAL_DAY = 80000
+
+
+def normalize_null_like_token(value: str) -> str:
+    return re.sub(r'[\s./\\_\-]+', "", value.strip().casefold().replace('"', "").replace("'", ""))
 
 
 def normalize_header(value: str) -> str:
@@ -70,7 +76,11 @@ def is_excel_serial_day_match(left_value: str, right_value: str) -> bool:
 
     left_day = int(left_decimal)
     right_day = int(right_decimal)
-    if left_day != right_day or left_day < 20000:
+    if (
+        left_day != right_day
+        or left_day < MIN_EXCEL_SERIAL_DAY
+        or left_day > MAX_EXCEL_SERIAL_DAY
+    ):
         return False
 
     return left_decimal != left_decimal.to_integral() or right_decimal != right_decimal.to_integral()
@@ -80,10 +90,13 @@ def excel_serial_to_iso_date(value: Decimal) -> str | None:
     if value != value.to_integral():
         return None
     serial_day = int(value)
-    if serial_day < 20000:
+    if serial_day < MIN_EXCEL_SERIAL_DAY or serial_day > MAX_EXCEL_SERIAL_DAY:
         return None
     base_date = datetime(1899, 12, 30)
-    return (base_date + timedelta(days=serial_day)).strftime("%Y-%m-%d")
+    try:
+        return (base_date + timedelta(days=serial_day)).strftime("%Y-%m-%d")
+    except OverflowError:
+        return None
 
 
 def parse_date_like(text: str) -> str | None:
@@ -114,14 +127,17 @@ def is_null_like(text: str) -> bool:
     without_quotes = token.replace('"', "").replace("'", "").strip()
     if without_quotes == "":
         return True
-    return token.replace(".", "") in {"na", "n/a", "null", "none"}
+    return normalize_null_like_token(token) in {"na", "null", "none", "nil"}
 
 
 def normalize_numeric_text(text: str) -> str | None:
     parsed_decimal = try_parse_decimal(text)
     if parsed_decimal is None:
         return None
-    if parsed_decimal != parsed_decimal.to_integral() and int(parsed_decimal) >= 20000:
+    if (
+        parsed_decimal != parsed_decimal.to_integral()
+        and MIN_EXCEL_SERIAL_DAY <= int(parsed_decimal) <= MAX_EXCEL_SERIAL_DAY
+    ):
         return str(int(parsed_decimal))
     return decimal_to_text(parsed_decimal)
 
@@ -438,12 +454,26 @@ def workbook_summary(workbook: dict[str, list[list[str]]]) -> dict[str, Any]:
 
 def resolve_mappings(left_headers: list[str], right_headers: list[str], requested: list[dict[str, str]]) -> list[dict[str, str]]:
     if requested:
-        return [mapping for mapping in requested if mapping.get("left") in left_headers and mapping.get("right") in right_headers]
+        return [
+            mapping
+            for mapping in requested
+            if mapping.get("left") in left_headers
+            and mapping.get("right") in right_headers
+            and normalize_header(mapping.get("left", ""))
+            and normalize_header(mapping.get("right", ""))
+        ]
 
-    right_lookup = {normalize_header(header): header for header in right_headers}
+    right_lookup = {
+        normalize_header(header): header
+        for header in right_headers
+        if normalize_header(header)
+    }
     auto = []
     for left in left_headers:
-        right = right_lookup.get(normalize_header(left))
+        normalized_left = normalize_header(left)
+        if not normalized_left:
+            continue
+        right = right_lookup.get(normalized_left)
         if right:
             auto.append({"left": left, "right": right})
     return auto

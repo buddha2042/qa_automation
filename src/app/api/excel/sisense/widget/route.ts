@@ -36,6 +36,23 @@ interface WidgetRequestBody {
   widgetId?: string;
 }
 
+interface JaqlMetadataItem extends Record<string, unknown> {
+  panel?: string;
+  disabled?: boolean;
+  field?: Record<string, unknown>;
+  jaql?: Record<string, unknown>;
+}
+
+type JaqlApiPayload = {
+  values?: unknown[];
+  data?: { values?: unknown[] };
+  details?: unknown;
+  extraDetails?: unknown;
+  type?: unknown;
+  subType?: unknown;
+  error?: { message?: string };
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -79,6 +96,77 @@ const prepareComparableWidget = (widget: SisenseWidget) => {
     })),
   };
 };
+
+const normalizeDatasourceForBody = (fullname: string): { fullname: string } => ({
+  fullname: fullname.startsWith('localhost/') ? fullname : `localhost/${fullname}`,
+});
+
+const normalizeJaqlMetadata = (
+  metadata: Array<Record<string, unknown>>,
+  datasource: { fullname: string }
+): JaqlMetadataItem[] =>
+  metadata.map((item, index) => {
+    const mapped: JaqlMetadataItem = { ...item };
+
+    if (mapped.disabled) return mapped;
+
+    if (mapped.panel === 'categories') mapped.panel = 'rows';
+
+    if (mapped.panel !== 'scope') {
+      const existingField = isRecord(mapped.field) ? mapped.field : {};
+      mapped.field = {
+        ...existingField,
+        index,
+        id: isRecord(mapped.jaql) ? mapped.jaql.dim ?? existingField.id : existingField.id,
+      };
+    }
+
+    if (mapped.panel === 'rows' && isRecord(mapped.jaql)) {
+      mapped.jaql = {
+        ...mapped.jaql,
+        pv: {
+          'Visible in View>Yes': 2,
+          'Aggregation>Count': 2,
+        },
+      };
+    }
+
+    if (mapped.panel === 'scope' && isRecord(mapped.jaql) && !mapped.jaql.datasource) {
+      mapped.jaql = {
+        ...mapped.jaql,
+        datasource,
+      };
+    }
+
+    return mapped;
+  });
+
+const findUnsupportedFormulaItems = (metadata: JaqlMetadataItem[]) =>
+  metadata.filter(
+    (item) =>
+      item.panel === 'scope' &&
+      isRecord(item.jaql) &&
+      item.jaql.type === 'measure' &&
+      typeof item.jaql.formula === 'string'
+  );
+
+const removeUnsupportedFormulaItems = (metadata: JaqlMetadataItem[]) =>
+  metadata.filter(
+    (item) =>
+      !(
+        item.panel === 'scope' &&
+        isRecord(item.jaql) &&
+        item.jaql.type === 'measure' &&
+        typeof item.jaql.formula === 'string'
+      )
+  );
+
+const getValuesFromJaqlPayload = (payload: JaqlApiPayload): unknown[] =>
+  Array.isArray(payload.values)
+    ? payload.values
+    : Array.isArray(payload.data?.values)
+      ? payload.data.values
+      : [];
 
 const jaqlLabel = (item: WidgetPanelItem): string => {
   if (!isRecord(item.jaql)) return '';
@@ -152,30 +240,76 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Selected widget does not expose queryable metadata.' }, { status: 400 });
     }
 
+    const normalizedDatasource = normalizeDatasourceForBody(datasourceFullname);
     const datasourceId = datasourceFullname.includes('/')
       ? datasourceFullname.split('/').pop() ?? datasourceFullname
       : datasourceFullname;
 
-    const jaqlResponse = await fetch(`${baseUrl}/api/datasources/${encodeURIComponent(datasourceId)}/jaql`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        datasource: {
-          fullname: datasourceFullname.startsWith('localhost/')
-            ? datasourceFullname
-            : `localhost/${datasourceFullname}`,
+    const normalizedMetadata = normalizeJaqlMetadata(widget.query.metadata, normalizedDatasource);
+    const runJaql = async (metadata: JaqlMetadataItem[]) => {
+      const jaqlResponse = await fetch(`${baseUrl}/api/datasources/${encodeURIComponent(datasourceId)}/jaql`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
         },
-        metadata: widget.query.metadata,
-        count: widget.query.count ?? 1000,
-      }),
-      cache: 'no-store',
-    });
+        body: JSON.stringify({
+          datasource: normalizedDatasource,
+          metadata,
+          count: widget.query.count ?? 1000,
+        }),
+        cache: 'no-store',
+      });
 
-    const payload = (await jaqlResponse.json()) as { values?: unknown[]; data?: { values?: unknown[] }; error?: { message?: string } };
+      const payload = (await jaqlResponse.json()) as JaqlApiPayload;
+      return { jaqlResponse, payload };
+    };
+
+    let { jaqlResponse, payload } = await runJaql(normalizedMetadata);
+    let warning: string | undefined;
+
+    if (typeof payload.subType === 'string' && payload.subType === 'formulaNotSupported') {
+      const unsupportedFormulas = findUnsupportedFormulaItems(normalizedMetadata).map((item) => ({
+        title:
+          isRecord(item.jaql) && typeof item.jaql.title === 'string'
+            ? item.jaql.title
+            : 'Formula',
+        formula:
+          isRecord(item.jaql) && typeof item.jaql.formula === 'string'
+            ? item.jaql.formula
+            : '',
+      }));
+
+      const retryMetadata = removeUnsupportedFormulaItems(normalizedMetadata);
+      if (retryMetadata.length < normalizedMetadata.length) {
+        const retryResult = await runJaql(retryMetadata);
+        if (retryResult.jaqlResponse.ok) {
+          jaqlResponse = retryResult.jaqlResponse;
+          payload = retryResult.payload;
+          warning =
+            'Some filters were not applied because Sisense breaks on this formula-based filter during live load. Broader live data was loaded after removing the unsupported formula filter. For more clarification, please ask Buddha.';
+        } else {
+          return NextResponse.json(
+            {
+              error:
+                'This live widget uses a formula-based filter that Sisense does not support in the JAQL API. Please use the exported file for comparison.',
+              unsupportedFormulas,
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          {
+            error:
+              'This live widget uses a formula-based filter that Sisense does not support in the JAQL API. Please use the exported file for comparison.',
+            unsupportedFormulas,
+          },
+          { status: 400 }
+        );
+      }
+    }
     if (!jaqlResponse.ok) {
       return NextResponse.json(
         { error: payload.error?.message ?? 'Failed to execute widget data query.' },
@@ -183,11 +317,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const values = Array.isArray(payload.values)
-      ? payload.values
-      : Array.isArray(payload.data?.values)
-        ? payload.data.values
-        : [];
+    const values = getValuesFromJaqlPayload(payload);
 
     const headers = buildHeaders(widget);
     const rows = normalizeRows(values, headers);
@@ -209,7 +339,7 @@ export async function POST(request: Request) {
       ],
     };
 
-    return NextResponse.json({ workbook, workbookData });
+    return NextResponse.json({ workbook, workbookData, warning });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ error: message }, { status: 500 });
