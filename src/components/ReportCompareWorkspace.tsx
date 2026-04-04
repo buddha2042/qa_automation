@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { ColumnMapping, CompareResult, WorkbookData, WorkbookSummary } from '@/lib/excelAudit';
 import { SISENSE_BASE_URLS } from '@/lib/sisenseEnvironments';
-import { AlertTriangle, ArrowDownUp, ChevronDown, ChevronUp, Database, FileSpreadsheet, RefreshCcw, Upload } from 'lucide-react';
+import { AlertTriangle, ArrowDownUp, ChevronDown, ChevronUp, Database, FileSpreadsheet, Upload } from 'lucide-react';
 
 interface InspectResponse {
   workbooks: {
@@ -24,16 +24,19 @@ interface SisenseDashboardOption {
 interface SisenseWidgetResponse {
   workbook: WorkbookSummary;
   workbookData: WorkbookData;
+  warning?: string;
 }
 
 const normalizeHeader = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 const UI_NULL_TOKENS = new Set(['', '-', 'na', 'n/a', 'null', 'none', 'nil', '""', "''", '/', '\\']);
 const EXCEL_AUDIT_SISENSE_STORAGE_KEY = 'excel-audit-sisense-config';
+const MIN_EXCEL_SERIAL_DAY = 20000;
+const MAX_EXCEL_SERIAL_DAY = 80000;
 
 const createMapping = (left = '', right = ''): ColumnMapping => ({ left, right });
 
 const excelSerialToIsoDate = (value: number) => {
-  if (!Number.isInteger(value) || value < 20000) return null;
+  if (!Number.isInteger(value) || value < MIN_EXCEL_SERIAL_DAY || value > MAX_EXCEL_SERIAL_DAY) return null;
   const utcMillis = Date.UTC(1899, 11, 30) + value * 24 * 60 * 60 * 1000;
   return new Date(utcMillis).toISOString().slice(0, 10);
 };
@@ -65,13 +68,55 @@ const parseDateLikeForUi = (value: string) => {
 };
 
 const autoMatchColumns = (leftHeaders: string[], rightHeaders: string[]): ColumnMapping[] => {
-  const rightLookup = new Map(rightHeaders.map((header) => [normalizeHeader(header), header]));
+  const rightLookup = new Map(
+    rightHeaders
+      .map((header) => [normalizeHeader(header), header] as const)
+      .filter(([normalized]) => Boolean(normalized))
+  );
+
   return leftHeaders
     .map((leftHeader) => {
-      const rightHeader = rightLookup.get(normalizeHeader(leftHeader));
+      const normalizedLeftHeader = normalizeHeader(leftHeader);
+      if (!normalizedLeftHeader) return null;
+
+      const rightHeader = rightLookup.get(normalizedLeftHeader);
       return rightHeader ? createMapping(leftHeader, rightHeader) : null;
     })
     .filter((mapping): mapping is ColumnMapping => Boolean(mapping));
+};
+
+const hasMeaningfulPreviewCellForUi = (value: string) => {
+  const text = String(value ?? '').trim();
+  if (!text) return false;
+  return normalizeCellForUi(text) !== '__null__';
+};
+
+const columnHasMeaningfulPreviewDataForUi = (sheet: WorkbookSummary['sheets'][number] | undefined, header: string) => {
+  if (!sheet) return false;
+  const columnIndex = sheet.headers.indexOf(header);
+  if (columnIndex < 0) return false;
+
+  return sheet.previewRows.some((row) => hasMeaningfulPreviewCellForUi(row[columnIndex] ?? ''));
+};
+
+const filterMappingsWithPreviewDataForUi = (
+  mappings: ColumnMapping[],
+  leftSheet: WorkbookSummary['sheets'][number] | undefined,
+  rightSheet: WorkbookSummary['sheets'][number] | undefined
+) =>
+  mappings.filter(
+    (mapping) =>
+      columnHasMeaningfulPreviewDataForUi(leftSheet, mapping.left) &&
+      columnHasMeaningfulPreviewDataForUi(rightSheet, mapping.right)
+  );
+
+const appendWarningMessage = (current: string, next: string) => {
+  const normalizedCurrent = current.trim();
+  const normalizedNext = next.trim();
+  if (!normalizedNext) return normalizedCurrent;
+  if (!normalizedCurrent) return normalizedNext;
+  if (normalizedCurrent.includes(normalizedNext)) return normalizedCurrent;
+  return `${normalizedCurrent} ${normalizedNext}`;
 };
 
 const isValidHttpUrl = (value: string) => {
@@ -83,6 +128,16 @@ const isValidHttpUrl = (value: string) => {
   }
 };
 
+const formatWidgetOptionLabel = (widget: { widgetId: string; title: string }) => {
+  const widgetId = widget.widgetId.trim();
+  const widgetTitle = widget.title.trim();
+
+  if (!widgetTitle) return widgetId;
+  if (widgetTitle === widgetId) return widgetTitle;
+
+  return `${widgetTitle} (${widgetId})`;
+};
+
 const normalizeCellForUi = (value: string) => {
   const text = String(value ?? '')
     .trim()
@@ -91,9 +146,11 @@ const normalizeCellForUi = (value: string) => {
   if (UI_NULL_TOKENS.has(text)) return '__null__';
   const withoutQuotes = text.replace(/["']/g, '').trim();
   if (!withoutQuotes) return '__null__';
+  const normalizedNullToken = normalizeNullLikeTokenForUi(text);
+  if (['na', 'null', 'none', 'nil'].includes(normalizedNullToken)) return '__null__';
   const numeric = Number(text.replace(/,/g, ''));
   if (!Number.isNaN(numeric) && Number.isFinite(numeric)) {
-    if (!Number.isInteger(numeric) && Math.trunc(numeric) >= 20000) {
+    if (!Number.isInteger(numeric) && Math.trunc(numeric) >= MIN_EXCEL_SERIAL_DAY && Math.trunc(numeric) <= MAX_EXCEL_SERIAL_DAY) {
       return String(Math.trunc(numeric));
     }
     return String(Number.isInteger(numeric) ? Math.trunc(numeric) : Number(numeric.toFixed(10)));
@@ -149,6 +206,9 @@ export default function ReportCompareWorkspace() {
   const [widgetLoading, setWidgetLoading] = useState(false);
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null);
   const [compareFilter, setCompareFilter] = useState<'mismatch' | 'match' | 'all'>('all');
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
+  const [loadedSisenseSourceKey, setLoadedSisenseSourceKey] = useState('');
+  const [warning, setWarning] = useState('');
   const [expandedTables, setExpandedTables] = useState({
     left: false,
     right: false,
@@ -156,17 +216,35 @@ export default function ReportCompareWorkspace() {
 
   const leftWorkbook = workbooks.left;
   const rightWorkbook = workbooks.right;
-  const leftSheet = leftWorkbook?.sheets.find((sheet) => sheet.name === selectedSheets.left) ?? leftWorkbook?.sheets[0];
-  const rightSheet = rightWorkbook?.sheets.find((sheet) => sheet.name === selectedSheets.right) ?? rightWorkbook?.sheets[0];
-  const leftHeaders = leftSheet?.headers ?? [];
-  const rightHeaders = rightSheet?.headers ?? [];
-  const canInspect = Boolean(leftFile && (rightSourceMode === 'upload' ? rightFile : sisenseWorkbookData));
+  const currentSisenseSourceKey = JSON.stringify({
+    baseUrl: sisenseConfig.baseUrl.trim(),
+    username: sisenseConfig.username.trim(),
+    dashboardId: sisenseConfig.dashboardId,
+    widgetId: sisenseConfig.widgetId,
+  });
+  const canInspect = Boolean(
+    leftFile &&
+      (rightSourceMode === 'upload'
+        ? rightFile
+        : sisenseWorkbookData && loadedSisenseSourceKey === currentSisenseSourceKey)
+  );
   const canCompare = Boolean(leftFile && (rightSourceMode === 'upload' ? rightFile : sisenseWorkbookData) && compareMappings.length > 0);
   const selectedDashboard = dashboards.find((dashboard) => dashboard.dashboardId === sisenseConfig.dashboardId);
   const visibleComparisonRows =
-    compareResult?.comparisonRows.filter((row) =>
-      compareFilter === 'all' ? true : compareFilter === 'match' ? row.status === 'MATCH' : row.status !== 'MATCH'
-    ) ?? [];
+    compareResult?.comparisonRows.filter((row) => {
+      const statusMatches =
+        compareFilter === 'all' ? true : compareFilter === 'match' ? row.status === 'MATCH' : row.status !== 'MATCH';
+      if (!statusMatches) return false;
+
+      return (compareResult?.matchedHeaders ?? []).every((mapping) => {
+        const filterValue = columnFilters[mapping.left]?.trim().toLowerCase() ?? '';
+        if (!filterValue) return true;
+
+        const leftValue = String(row.leftValues[mapping.left] ?? '').toLowerCase();
+        const rightValue = String(row.rightValues[mapping.right] ?? '').toLowerCase();
+        return leftValue.includes(filterValue) || rightValue.includes(filterValue);
+      });
+    }) ?? [];
   const comparedLeftHeaders = compareResult?.matchedHeaders.map((mapping) => mapping.left) ?? [];
   const comparedRightHeaders = compareResult?.matchedHeaders.map((mapping) => mapping.right) ?? [];
   const ignoredLeftHeaders = compareResult?.left.headers.filter((header) => !comparedLeftHeaders.includes(header)) ?? [];
@@ -257,6 +335,11 @@ export default function ReportCompareWorkspace() {
 
     setInspectLoading(true);
     setError('');
+    setWarning((current) =>
+      current.includes('Some matched columns were excluded from preview')
+        ? ''
+        : current
+    );
     setCompareResult(null);
 
     try {
@@ -281,7 +364,18 @@ export default function ReportCompareWorkspace() {
 
       const nextLeftSheet = nextLeft.sheets[0];
       const nextRightSheet = nextRight.sheets[0];
-      const suggestedMappings = autoMatchColumns(nextLeftSheet?.headers ?? [], nextRightSheet?.headers ?? []);
+      const rawSuggestedMappings = autoMatchColumns(nextLeftSheet?.headers ?? [], nextRightSheet?.headers ?? []);
+      const suggestedMappings = filterMappingsWithPreviewDataForUi(
+        rawSuggestedMappings,
+        nextLeftSheet,
+        nextRightSheet
+      );
+      const excludedMappings = rawSuggestedMappings.filter(
+        (mapping) =>
+          !suggestedMappings.some(
+            (candidate) => candidate.left === mapping.left && candidate.right === mapping.right
+          )
+      );
 
       setWorkbooks({ left: nextLeft, right: nextRight });
       setSelectedSheets({
@@ -289,17 +383,25 @@ export default function ReportCompareWorkspace() {
         right: nextRightSheet?.name ?? '',
       });
       setCompareMappings(suggestedMappings.length > 0 ? suggestedMappings : [createMapping()]);
+      setColumnFilters({});
       setExpandedTables({ left: false, right: false });
+      if (excludedMappings.length > 0) {
+        const excludedLabels = excludedMappings
+          .map((mapping) => mapping.left)
+          .filter(Boolean)
+          .join(', ');
+        setWarning((current) =>
+          appendWarningMessage(
+            current,
+            `Some matched columns were excluded from preview because one side did not return meaningful data for them: ${excludedLabels}.`
+          )
+        );
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to inspect files.');
     } finally {
       setInspectLoading(false);
     }
-  };
-
-  const refreshAutoMappings = () => {
-    const suggestedMappings = autoMatchColumns(leftHeaders, rightHeaders);
-    setCompareMappings(suggestedMappings.length > 0 ? suggestedMappings : [createMapping()]);
   };
 
   const handleCompare = async () => {
@@ -341,6 +443,7 @@ export default function ReportCompareWorkspace() {
 
       setCompareResult(json);
       setCompareFilter('all');
+      setColumnFilters({});
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to compare files.');
     } finally {
@@ -398,6 +501,7 @@ export default function ReportCompareWorkspace() {
 
     setWidgetLoading(true);
     setError('');
+    setWarning('');
 
     try {
       const response = await fetch('/api/excel/sisense/widget', {
@@ -418,9 +522,11 @@ export default function ReportCompareWorkspace() {
       }
 
       setSisenseWorkbookData(json.workbookData);
+      setLoadedSisenseSourceKey(currentSisenseSourceKey);
       setWorkbooks((current) => ({ ...current, right: json.workbook }));
       setSelectedSheets((current) => ({ ...current, right: json.workbook.sheets[0]?.name ?? '' }));
       setCompareResult(null);
+      setWarning(json.warning ?? '');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Failed to load connected widget.');
     } finally {
@@ -466,11 +572,12 @@ export default function ReportCompareWorkspace() {
                     setRightSourceMode('upload');
                     setWorkbooks((current) => ({ ...current, right: undefined }));
                     setSisenseWorkbookData(null);
+                    setLoadedSisenseSourceKey('');
                     setCompareResult(null);
                   }}
                   className={`rounded-xl px-3 py-2 ${rightSourceMode === 'upload' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
                 >
-                  File
+                  Upload File
                 </button>
                 <button
                   type="button"
@@ -478,11 +585,12 @@ export default function ReportCompareWorkspace() {
                     setRightSourceMode('sisense');
                     setRightFile(null);
                     setWorkbooks((current) => ({ ...current, right: undefined }));
+                    setLoadedSisenseSourceKey('');
                     setCompareResult(null);
                   }}
                   className={`rounded-xl px-3 py-2 ${rightSourceMode === 'sisense' ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
                 >
-                  Widget
+                  Sisense Live
                 </button>
               </div>
             </div>
@@ -527,23 +635,27 @@ export default function ReportCompareWorkspace() {
                     className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   />
                 </label>
-                <div className="flex flex-wrap gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={handleLoadSisenseInventory}
                     disabled={inventoryLoading}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 disabled:opacity-60"
+                    className="group inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:shadow-[0_12px_28px_rgba(15,23,42,0.10)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Database size={15} />
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-hover:bg-slate-200">
+                      <Database size={15} />
+                    </span>
                     {inventoryLoading ? 'Loading...' : 'Load Dashboards'}
                   </button>
                   <button
                     type="button"
                     onClick={handleLoadSisenseWidget}
                     disabled={widgetLoading || dashboards.length === 0}
-                    className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-sky-200 disabled:opacity-60"
+                    className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#0f172a_0%,#0369a1_55%,#0ea5e9_100%)] px-4 py-3 text-sm font-bold text-white shadow-[0_14px_34px_rgba(14,165,233,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(14,165,233,0.34)] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <Upload size={15} />
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/16 text-white ring-1 ring-white/18">
+                      <Upload size={15} />
+                    </span>
                     {widgetLoading ? 'Loading Widget...' : 'Load Connected Data'}
                   </button>
                 </div>
@@ -564,8 +676,8 @@ export default function ReportCompareWorkspace() {
                       className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                     >
                       <option value="">Select dashboard</option>
-                      {dashboards.map((dashboard) => (
-                        <option key={dashboard.dashboardId} value={dashboard.dashboardId}>
+                      {dashboards.map((dashboard, index) => (
+                        <option key={`${dashboard.dashboardId}:${index}`} value={dashboard.dashboardId}>
                           {dashboard.title}
                         </option>
                       ))}
@@ -579,9 +691,9 @@ export default function ReportCompareWorkspace() {
                       className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                     >
                       <option value="">Select widget</option>
-                      {(selectedDashboard?.widgets ?? []).map((widget) => (
-                        <option key={widget.widgetId} value={widget.widgetId}>
-                          {widget.title}
+                      {(selectedDashboard?.widgets ?? []).map((widget, index) => (
+                        <option key={`${widget.widgetId}:${index}`} value={widget.widgetId}>
+                          {formatWidgetOptionLabel(widget)}
                         </option>
                       ))}
                     </select>
@@ -610,11 +722,17 @@ export default function ReportCompareWorkspace() {
             <p>{error}</p>
           </div>
         ) : null}
+        {!error && warning ? (
+          <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+            <p>{warning}</p>
+          </div>
+        ) : null}
       </section>
 
       {leftWorkbook && rightWorkbook ? (
         <section className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
+          <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-5 shadow-sm">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.25em] text-blue-600">Visual Preview</p>
               <h2 className="mt-1 text-2xl font-black tracking-tight">Normalized left and right tables</h2>
@@ -622,14 +740,6 @@ export default function ReportCompareWorkspace() {
                 Only matching headers are shown so both sides can be reviewed in the same structure.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={refreshAutoMappings}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:bg-slate-50"
-            >
-              <RefreshCcw size={14} />
-              Refresh Matched Headers
-            </button>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-2">
@@ -766,6 +876,13 @@ export default function ReportCompareWorkspace() {
                   >
                     Export CSV
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setColumnFilters({})}
+                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                  >
+                    Clear Filters
+                  </button>
                 </div>
               </div>
             </div>
@@ -778,6 +895,26 @@ export default function ReportCompareWorkspace() {
                     {compareResult.matchedHeaders.map((mapping) => (
                       <th key={`${mapping.left}-${mapping.right}`} className="min-w-[180px] border border-slate-800 px-4 py-3 font-bold">
                         {mapping.left}
+                      </th>
+                    ))}
+                  </tr>
+                  <tr className="bg-slate-900">
+                    <th className="sticky left-0 z-20 border border-slate-800 bg-slate-900 px-4 py-2">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Filters</span>
+                    </th>
+                    {compareResult.matchedHeaders.map((mapping) => (
+                      <th key={`filter-${mapping.left}-${mapping.right}`} className="border border-slate-800 px-3 py-2">
+                        <input
+                          value={columnFilters[mapping.left] ?? ''}
+                          onChange={(event) =>
+                            setColumnFilters((current) => ({
+                              ...current,
+                              [mapping.left]: event.target.value,
+                            }))
+                          }
+                          placeholder={`Filter ${mapping.left}`}
+                          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-xs font-medium text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                        />
                       </th>
                     ))}
                   </tr>
@@ -796,7 +933,12 @@ export default function ReportCompareWorkspace() {
                         };
                       });
                       const rowHasVisibleDifference = cellComparisons.some((cell) => !cell.isCellMatch);
-                      const effectiveStatus = row.status === 'MATCH' && rowHasVisibleDifference ? 'MISMATCH' : row.status;
+                      const effectiveStatus =
+                        row.status === 'ONLY_IN_LEFT' || row.status === 'ONLY_IN_RIGHT'
+                          ? row.status
+                          : rowHasVisibleDifference
+                            ? 'MISMATCH'
+                            : 'MATCH';
 
                       return (
                         <tr
@@ -928,9 +1070,13 @@ function WorkbookCard({
     compareMappings.length > 0
       ? compareMappings.map((mapping) => (label === 'Left Source' ? mapping.left : mapping.right))
       : currentSheet?.headers ?? [];
-  const visibleIndexes = visibleHeaders.map((header) => currentSheet?.headers.indexOf(header) ?? -1);
   const panelHeight = expanded ? 'max-h-[75vh]' : 'max-h-[460px]';
   const accentTone = label === 'Left Source' ? 'text-blue-600' : 'text-sky-600';
+
+  const getCellValueForHeader = (row: string[], header: string) => {
+    const headerIndex = currentSheet?.headers.indexOf(header) ?? -1;
+    return headerIndex >= 0 ? row[headerIndex] ?? '' : '';
+  };
 
   return (
     <div className="overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-sm">
@@ -979,9 +1125,9 @@ function WorkbookCard({
                   <tbody>
                     {currentSheet.previewRows.map((row, rowIndex) => (
                       <tr key={rowIndex} className="border-t border-slate-100 bg-white odd:bg-slate-50/60">
-                        {visibleIndexes.map((cellIndex, visibleIndex) => (
+                        {visibleHeaders.map((header, visibleIndex) => (
                           <td key={`${rowIndex}-${visibleIndex}`} className="px-4 py-3 text-slate-700">
-                            {(cellIndex >= 0 ? row[cellIndex] : '') || '-'}
+                            {getCellValueForHeader(row, header) || '-'}
                           </td>
                         ))}
                       </tr>
@@ -1042,3 +1188,9 @@ function SummaryListCard({
     </div>
   );
 }
+const normalizeNullLikeTokenForUi = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/["']/g, '')
+    .replace(/[\s./\\_-]+/g, '');
