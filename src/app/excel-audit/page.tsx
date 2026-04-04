@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import AppHeader from '@/components/AppHeader';
+import SisenseDashboardMigrationWorkspace from '@/components/SisenseDashboardMigrationWorkspace';
 import SisenseDashboardTransferWorkspace from '@/components/SisenseDashboardTransferWorkspace';
 import SisenseUserDashboardInventory from '@/components/SisenseUserDashboardInventory';
 import SmodelTableTransferWorkspace from '@/components/SmodelTableTransferWorkspace';
@@ -12,6 +13,7 @@ type AuditTab =
   | 'widget-inventory'
   | 'function-inventory'
   | 'user-lookup'
+  | 'dashboard-migration'
   | 'dashboard-transfer'
   | 'table-transfer'
   | 'supplemental-fields';
@@ -20,6 +22,7 @@ const TAB_OPTIONS: Array<{ id: AuditTab; label: string; access: 'admin' | 'super
   { id: 'widget-inventory', label: 'Widget Inventory', access: 'super-admin' },
   { id: 'function-inventory', label: 'Function Lookup', access: 'super-admin' },
   { id: 'user-lookup', label: 'User Lookup', access: 'super-admin' },
+  { id: 'dashboard-migration', label: 'Dashboard Migration', access: 'admin' },
   { id: 'dashboard-transfer', label: 'Dashboard Transfer', access: 'super-admin' },
   { id: 'table-transfer', label: 'Table Transfer', access: 'admin' },
   { id: 'supplemental-fields', label: 'Supplemental Table', access: 'super-admin' },
@@ -84,15 +87,15 @@ export default function AuditPage() {
             <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-500">Access Restricted</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Admin access required</h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Table transfer is available only for admin users. Widget inventory, function lookup, user lookup, dashboard transfer, and supplemental table require super admin access.
+              Table transfer and dashboard migration are available only for admin users. Widget inventory, function lookup, user lookup, dashboard transfer, and supplemental table require super admin access.
             </p>
           </section>
-        ) : !isSuperAdminEnabled && resolvedActiveTab !== 'table-transfer' ? (
+        ) : !isSuperAdminEnabled && resolvedActiveTab !== 'table-transfer' && resolvedActiveTab !== 'dashboard-migration' ? (
           <section className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-sm">
             <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-500">Access Restricted</p>
             <h2 className="mt-2 text-2xl font-black tracking-tight text-slate-900">Super admin access required</h2>
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              Widget inventory, function lookup, user lookup, dashboard transfer, and supplemental table are available only for super admin users. Table transfer remains available for admin users.
+              Widget inventory, function lookup, user lookup, dashboard transfer, and supplemental table are available only for super admin users. Table transfer and dashboard migration remain available for admin users.
             </p>
           </section>
         ) : resolvedActiveTab === 'widget-inventory' ? (
@@ -107,6 +110,8 @@ export default function AuditPage() {
             initialToken={masterInspectorConfig.token}
             mode="user"
           />
+        ) : resolvedActiveTab === 'dashboard-migration' ? (
+          <SisenseDashboardMigrationWorkspace initialBaseUrl={masterInspectorConfig.baseUrl} />
         ) : resolvedActiveTab === 'dashboard-transfer' ? (
           <SisenseDashboardTransferWorkspace
             initialBaseUrl={masterInspectorConfig.baseUrl}
